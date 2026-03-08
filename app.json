@@ -29,7 +29,9 @@
       "favicon": "./icon.png"
     },
     "extra": {
-      "eas": {}
+      "eas": {
+        "projectId": "b8c9d0e1-2f3a-4567-89ab-cdef12345678"
+      }
     },
     "owner": "clawdbotfmm"
   }
