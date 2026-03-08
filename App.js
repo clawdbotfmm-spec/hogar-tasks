@@ -176,6 +176,12 @@ export default function App() {
 
   // Login con PIN
   const handleLogin = () => {
+    // PIN especial para crear usuarios iniciales
+    if (pin === '0000' && usuarios.length === 0) {
+      crearUsuarioInicial();
+      return;
+    }
+    
     const found = usuarios.find(u => u.pin === pin);
     if (found) {
       setUser(found);
@@ -401,9 +407,10 @@ export default function App() {
             </TouchableOpacity>
             
             {usuarios.length === 0 && (
-              <TouchableOpacity style={styles.createButton} onPress={crearUsuarioInicial}>
-                <Text style={styles.createButtonText}>Crear usuarios iniciales</Text>
-              </TouchableOpacity>
+              <View style={styles.createButton}>
+                <Text style={styles.createButtonText}>Primera vez: usa PIN 0000</Text>
+                <Text style={styles.createButtonText}>para crear usuarios</Text>
+              </View>
             )}
             
             <Text style={styles.pinHint}>PINs: Daniel=1234, Sergio=2345, Diego=3456, Adulto=9999</Text>
