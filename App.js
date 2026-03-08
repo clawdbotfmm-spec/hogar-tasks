@@ -114,26 +114,24 @@ const PREMIOS = [
 
 export default function App() {
   const [user, setUser] = useState(null);
-  const [pin, setPin] = useState('');
   const [usuarios, setUsuarios] = useState([]);
   const [tareasDelDia, setTareasDelDia] = useState([]);
   const [historial, setHistorial] = useState([]);
-  const [coberturas, setCoberturas] = useState([]);
-  const [proyectos, setProyectos] = useState([]);
   const [loading, setLoading] = useState(true);
   
   const [tab, setTab] = useState('tareas');
-  const [showAdmin, setShowAdmin] = useState(false);
-  const [adminPin, setAdminPin] = useState('');
-  const [showProyecto, setShowProyecto] = useState(false);
-  const [nuevoProyecto, setNuevoProyecto] = useState({ nombre: '', puntos: 100 });
-  const [showPremios, setShowPremios] = useState(false);
   
   // Cargar datos en tiempo real
   useEffect(() => {
     const unsubUsuarios = onSnapshot(collection(db, 'hogar_usuarios'), (snapshot) => {
-      setUsuarios(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      const usuariosData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setUsuarios(usuariosData);
       setLoading(false);
+      
+      // Si no hay usuarios, crearlos automáticamente
+      if (usuariosData.length === 0) {
+        crearUsuariosIniciales();
+      }
     });
 
     const unsubTareas = onSnapshot(
@@ -156,6 +154,23 @@ export default function App() {
       unsubHistorial();
     };
   }, []);
+  
+  // Crear usuarios iniciales
+  const crearUsuariosIniciales = async () => {
+    const usuariosBase = [
+      { nombre: 'Daniel', puntos: 0, racha: 0, nivel: 1, responsabilidad: 'ropa', isAdmin: false },
+      { nombre: 'Sergio', puntos: 0, racha: 0, nivel: 1, responsabilidad: 'cocina', isAdmin: false },
+      { nombre: 'Diego', puntos: 0, racha: 0, nivel: 1, responsabilidad: 'lavabos', isAdmin: false },
+      { nombre: 'Adulto', puntos: 0, racha: 0, nivel: 1, responsabilidad: 'verificacion', isAdmin: true }
+    ];
+    
+    for (const u of usuariosBase) {
+      await addDoc(collection(db, 'hogar_usuarios'), {
+        ...u,
+        creado: new Date().toISOString()
+      });
+    }
+  };
 
   // Calcular nivel
   const getNivel = (puntos) => {
@@ -174,42 +189,7 @@ export default function App() {
     return Math.min(progreso, 100);
   };
 
-  // Login con PIN
-  const handleLogin = () => {
-    // PIN especial para crear usuarios iniciales
-    if (pin === '0000' && usuarios.length === 0) {
-      crearUsuarioInicial();
-      return;
-    }
-    
-    const found = usuarios.find(u => u.pin === pin);
-    if (found) {
-      setUser(found);
-      setPin('');
-    } else {
-      Alert.alert('Error', 'PIN incorrecto');
-    }
-  };
-
-  // Crear usuario inicial
-  const crearUsuarioInicial = async () => {
-    const usuariosBase = [
-      { nombre: 'Daniel', pin: '1234', puntos: 0, racha: 0, nivel: 1, responsabilidad: 'ropa', isAdmin: false },
-      { nombre: 'Sergio', pin: '2345', puntos: 0, racha: 0, nivel: 1, responsabilidad: 'cocina', isAdmin: false },
-      { nombre: 'Diego', pin: '3456', puntos: 0, racha: 0, nivel: 1, responsabilidad: 'lavabos', isAdmin: false },
-      { nombre: 'Adulto', pin: '9999', puntos: 0, racha: 0, nivel: 1, responsabilidad: 'verificacion', isAdmin: true }
-    ];
-    
-    for (const u of usuariosBase) {
-      await addDoc(collection(db, 'hogar_usuarios'), {
-        ...u,
-        creado: new Date().toISOString()
-      });
-    }
-    Alert.alert('✅', 'Usuarios creados');
-  };
-
-  // Marcar tarea completada
+  // Crear usuarios iniciales
   const completarTarea = async (tarea) => {
     if (!user) return;
     
@@ -380,42 +360,48 @@ export default function App() {
     );
   }
 
-  // Pantalla de login
+  // Pantalla de login (selección de usuario)
   if (!user) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="light-content" backgroundColor="#1e293b" />
-        <KeyboardAvoidingView style={styles.container}>
+    // Si no hay usuarios, crearlos automáticamente
+    if (usuarios.length === 0) {
+      return (
+        <SafeAreaView style={styles.safeArea}>
+          <StatusBar barStyle="light-content" backgroundColor="#1e293b" />
           <View style={styles.loginContainer}>
             <Text style={styles.logoIcon}>🏠</Text>
             <Text style={styles.loginTitle}>Hogar Tasks</Text>
-            <Text style={styles.loginSubtitle}>Introduce tu PIN</Text>
-            
-            <TextInput
-              style={styles.pinInput}
-              placeholder="PIN"
-              placeholderTextColor="#64748b"
-              keyboardType="numeric"
-              maxLength={4}
-              secureTextEntry
-              value={pin}
-              onChangeText={setPin}
-            />
-            
-            <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-              <Text style={styles.loginButtonText}>Entrar</Text>
-            </TouchableOpacity>
-            
-            {usuarios.length === 0 && (
-              <View style={styles.createButton}>
-                <Text style={styles.createButtonText}>Primera vez: usa PIN 0000</Text>
-                <Text style={styles.createButtonText}>para crear usuarios</Text>
-              </View>
-            )}
-            
-            <Text style={styles.pinHint}>PINs: Daniel=1234, Sergio=2345, Diego=3456, Adulto=9999</Text>
+            <Text style={styles.loginSubtitle}>Creando usuarios...</Text>
           </View>
-        </KeyboardAvoidingView>
+        </SafeAreaView>
+      );
+      // Nota: useEffect creará los usuarios automáticamente
+    }
+    
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="light-content" backgroundColor="#1e293b" />
+        <View style={styles.loginContainer}>
+          <Text style={styles.logoIcon}>🏠</Text>
+          <Text style={styles.loginTitle}>Hogar Tasks</Text>
+          <Text style={styles.loginSubtitle}>¿Quién eres?</Text>
+          
+          <FlatList
+            data={usuarios}
+            keyExtractor={item => item.id}
+            style={styles.userList}
+            renderItem={({ item }) => (
+              <TouchableOpacity 
+                style={styles.userButton}
+                onPress={() => setUser(item)}
+              >
+                <Text style={styles.userButtonText}>
+                  {item.isAdmin ? '👑' : item.nombre === 'Daniel' ? '👕' : item.nombre === 'Sergio' ? '🍳' : item.nombre === 'Diego' ? '🚿' : '👤'} {item.nombre}
+                </Text>
+                <Text style={styles.userButtonBalance}>{item.puntos || 0} pts</Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
       </SafeAreaView>
     );
   }
@@ -726,6 +712,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 8,
     marginBottom: 32
+  },
+  userList: {
+    width: '100%'
+  },
+  userButton: {
+    backgroundColor: '#334155',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#475569'
+  },
+  userButtonText: {
+    color: '#f1f5f9',
+    fontSize: 18,
+    fontWeight: '600'
+  },
+  userButtonBalance: {
+    color: '#10b981',
+    fontSize: 16,
+    fontWeight: '700'
   },
   pinInput: {
     backgroundColor: '#334155',
