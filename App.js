@@ -80,7 +80,9 @@ const TAREAS_BASE = {
     { id: 'limpiar_lavabo2', nombre: 'Limpiar lavabo secundario', puntos: 15, frecuencia: 'diaria' },
     { id: 'recoger_basuras', nombre: 'Recoger basuras de toda la casa', puntos: 15, frecuencia: 'diaria' },
     { id: 'tirar_basuras', nombre: 'Tirar basuras al contenedor', puntos: 15, frecuencia: 'diaria' },
-    { id: 'papel_higienico', nombre: 'Comprobar papel higiénico', puntos: 5, frecuencia: 'diaria' }
+    { id: 'papel_higienico', nombre: 'Comprobar papel higiénico', puntos: 5, frecuencia: 'diaria' },
+    { id: 'subir_persianas', nombre: 'Subir persianas por la mañana', puntos: 10, frecuencia: 'diaria' },
+    { id: 'bajar_persianas', nombre: 'Bajar persianas por la noche', puntos: 10, frecuencia: 'diaria' }
   ]
 };
 
