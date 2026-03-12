@@ -28,27 +28,37 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 export const db = getFirestore(app);
 
-// ─── Crear usuarios iniciales si no existen ──────────────
+// ─── Crear usuarios iniciales si no existen ────────────────────────────────
+// BUGFIX: Usa setDoc con IDs fijos + comprueba existencia antes de crear.
+// El bug anterior usaba addDoc (ID aleatorio) dentro de un listener que
+// se disparaba con data.length === 0 durante la latencia inicial de Firestore,
+// lo que duplicaba los 4 usuarios cada vez que la app arrancaba tras medianoche.
 export const crearUsuariosIniciales = async () => {
   const base = [
-    { nombre: 'Daniel', puntos: 0, racha: 0, nivel: 1, isAdmin: false },
-    { nombre: 'Sergio', puntos: 0, racha: 0, nivel: 1, isAdmin: false },
-    { nombre: 'Diego',  puntos: 0, racha: 0, nivel: 1, isAdmin: false },
-    { nombre: 'Adulto', puntos: 0, racha: 0, nivel: 1, isAdmin: true  },
+    { id: 'usuario_daniel', nombre: 'Daniel', puntos: 0, racha: 0, nivel: 1, isAdmin: false },
+    { id: 'usuario_sergio', nombre: 'Sergio', puntos: 0, racha: 0, nivel: 1, isAdmin: false },
+    { id: 'usuario_diego',  nombre: 'Diego',  puntos: 0, racha: 0, nivel: 1, isAdmin: false },
+    { id: 'usuario_adulto', nombre: 'Adulto', puntos: 0, racha: 0, nivel: 1, isAdmin: true  },
   ];
+
   for (const u of base) {
-    await addDoc(collection(db, 'hogar_usuarios'), {
-      ...u,
-      creado: new Date().toISOString(),
-    });
+    const ref = doc(db, 'hogar_usuarios', u.id);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      const { id, ...datos } = u;
+      await setDoc(ref, { ...datos, creado: new Date().toISOString() });
+    }
   }
 };
 
-// ─── Hook principal ───────────────────────────────────────
+// ─── Hook principal ────────────────────────────────────────────────────────
 export const useFirestore = () => {
-  const [usuarios,  setUsuarios]  = useState([]);
+  const [usuarios, setUsuarios] = useState([]);
   const [historial, setHistorial] = useState([]);
-  const [loading,   setLoading]   = useState(true);
+  const [loading, setLoading] = useState(true);
+  // Flag para evitar llamar a crearUsuariosIniciales mientras Firestore
+  // todavía está cargando (la latencia inicial devuelve length === 0 brevemente)
+  const [iniciado, setIniciado] = useState(false);
 
   useEffect(() => {
     const unsubUsuarios = onSnapshot(
@@ -57,7 +67,14 @@ export const useFirestore = () => {
         const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         setUsuarios(data);
         setLoading(false);
-        if (data.length === 0) crearUsuariosIniciales();
+
+        // Solo crear usuarios si ya tenemos la respuesta real de Firestore
+        // (snap.metadata.fromCache === false significa que llegó del servidor)
+        // y la colección está vacía de verdad.
+        if (data.length === 0 && !snap.metadata.fromCache) {
+          crearUsuariosIniciales();
+        }
+        setIniciado(true);
       }
     );
 
@@ -66,27 +83,29 @@ export const useFirestore = () => {
       (snap) => setHistorial(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     );
 
-    return () => { unsubUsuarios(); unsubHistorial(); };
+    return () => {
+      unsubUsuarios();
+      unsubHistorial();
+    };
   }, []);
 
-  // ── Completar tarea ─────────────────────────────────────
+  // ── Completar tarea ──────────────────────────────────────────────────────
   const completarTarea = async (user, tarea, puntosConBonus) => {
     const fechaHoy = new Date().toISOString().split('T')[0];
     await addDoc(collection(db, 'hogar_historial'), {
-      usuarioId:     user.id,
+      usuarioId: user.id,
       usuarioNombre: user.nombre,
-      tareaId:       tarea.id,
-      tareaNombre:   tarea.nombre,
-      puntos:        puntosConBonus,
-      tipo:          tarea.tipo || 'base',
-      fecha:         new Date().toISOString(),
-      fechaDia:      fechaHoy,
-      estado:        'pendiente_verificacion',
+      tareaId: tarea.id,
+      tareaNombre: tarea.nombre,
+      puntos: puntosConBonus,
+      tipo: tarea.tipo || 'base',
+      fecha: new Date().toISOString(),
+      fechaDia: fechaHoy,
+      estado: 'pendiente_verificacion',
     });
   };
 
-  // ── Deshacer tarea (usuario) ────────────────────────────
-  // Si la tarea ya estaba verificada (puntos sumados), los restamos también.
+  // ── Deshacer tarea (usuario) ─────────────────────────────────────────────
   const deshacerTarea = async (historialId) => {
     if (!historialId) return;
     const entrada = historial.find(h => h.id === historialId);
@@ -100,30 +119,29 @@ export const useFirestore = () => {
         });
       }
     }
-
     await deleteDoc(doc(db, 'hogar_historial', historialId));
   };
 
-  // ── Verificar/rechazar tarea (admin) ────────────────────
+  // ── Verificar/rechazar tarea (admin) ─────────────────────────────────────
   const verificarTarea = async (tarea, aprobada) => {
     const usuario = usuarios.find(u => u.id === tarea.usuarioId);
     if (!usuario) return;
 
     if (aprobada) {
       const fechaHoy = new Date().toISOString().split('T')[0];
-      // Bug fix: racha solo sube una vez por día
       const tareasHoyVerificadas = historial.filter(h =>
         h.usuarioId === usuario.id &&
-        h.fechaDia  === fechaHoy &&
-        h.estado    === 'verificada'
+        h.fechaDia === fechaHoy &&
+        h.estado === 'verificada'
       );
-      const nuevaRacha = tareasHoyVerificadas.length === 0
-        ? (usuario.racha || 0) + 1
-        : usuario.racha;
+      const nuevaRacha =
+        tareasHoyVerificadas.length === 0
+          ? (usuario.racha || 0) + 1
+          : usuario.racha;
 
       await updateDoc(doc(db, 'hogar_usuarios', usuario.id), {
         puntos: (usuario.puntos || 0) + tarea.puntos,
-        racha:  nuevaRacha,
+        racha: nuevaRacha,
       });
       await updateDoc(doc(db, 'hogar_historial', tarea.id), { estado: 'verificada' });
     } else {
@@ -131,8 +149,7 @@ export const useFirestore = () => {
     }
   };
 
-  // ── Ajustar puntos manualmente (admin) ─────────────────────
-  // cantidad puede ser negativa (restar) o positiva (añadir)
+  // ── Ajustar puntos manualmente (admin) ───────────────────────────────────
   const ajustarPuntos = async (usuarioId, cantidad) => {
     const usuario = usuarios.find(u => u.id === usuarioId);
     if (!usuario) return;
@@ -140,12 +157,12 @@ export const useFirestore = () => {
     await updateDoc(doc(db, 'hogar_usuarios', usuarioId), { puntos: nuevos });
   };
 
-  // ── Resetear puntos y racha de un usuario ──────────────────
+  // ── Resetear puntos y racha de un usuario ────────────────────────────────
   const resetearPuntosUsuario = async (usuarioId) => {
     await updateDoc(doc(db, 'hogar_usuarios', usuarioId), { puntos: 0, racha: 0 });
   };
 
-  // ── Recalcular puntos desde historial (herramienta admin) ─
+  // ── Recalcular puntos desde historial (herramienta admin) ────────────────
   const recalcularPuntos = async () => {
     const verificadas = historial.filter(h => h.estado === 'verificada');
     const porUsuario = {};
@@ -161,44 +178,44 @@ export const useFirestore = () => {
     }
   };
 
-  // ── Canjear premio ──────────────────────────────────────
+  // ── Canjear premio ───────────────────────────────────────────────────────
   const canjearPremio = async (user, premio) => {
     await updateDoc(doc(db, 'hogar_usuarios', user.id), {
       puntos: user.puntos - premio.puntos,
     });
     await addDoc(collection(db, 'hogar_historial'), {
-      usuarioId:     user.id,
+      usuarioId: user.id,
       usuarioNombre: user.nombre,
-      tipo:          'premio',
-      premioNombre:  premio.nombre,
-      puntos:        -premio.puntos,
-      fecha:         new Date().toISOString(),
+      tipo: 'premio',
+      premioNombre: premio.nombre,
+      puntos: -premio.puntos,
+      fecha: new Date().toISOString(),
     });
   };
 
-  // ── Comprar booster ─────────────────────────────────────
+  // ── Comprar booster ──────────────────────────────────────────────────────
   const comprarBooster = async (user, booster, precioFinal) => {
     const fechaFin = new Date();
     fechaFin.setDate(fechaFin.getDate() + booster.duracion);
     const nuevo = {
-      id:            booster.id,
-      nombre:        booster.nombre,
+      id: booster.id,
+      nombre: booster.nombre,
       multiplicador: booster.multiplicador,
-      fechaInicio:   new Date().toISOString(),
-      fechaFin:      fechaFin.toISOString(),
+      fechaInicio: new Date().toISOString(),
+      fechaFin: fechaFin.toISOString(),
     };
     await updateDoc(doc(db, 'hogar_usuarios', user.id), {
-      puntos:   user.puntos - precioFinal,
+      puntos: user.puntos - precioFinal,
       boosters: [...(user.boosters || []), nuevo],
     });
   };
 
-  // ── Comprar booster especial ────────────────────────────
+  // ── Comprar booster especial ─────────────────────────────────────────────
   const comprarBoosterEspecial = async (user, booster) => {
     const nuevo = {
-      id:          booster.id,
-      nombre:      booster.nombre,
-      tipo:        booster.tipo,
+      id: booster.id,
+      nombre: booster.nombre,
+      tipo: booster.tipo,
       fechaCompra: new Date().toISOString(),
     };
     if (booster.tipo === 'extras') {
@@ -207,13 +224,12 @@ export const useFirestore = () => {
       nuevo.fechaFin = fechaFin.toISOString();
     }
     await updateDoc(doc(db, 'hogar_usuarios', user.id), {
-      puntos:            user.puntos - booster.puntos,
+      puntos: user.puntos - booster.puntos,
       boostersEspeciales: [...(user.boostersEspeciales || []), nuevo],
     });
   };
 
-  // ── Resetear todas las tareas de hoy (admin) ──────────
-  // Elimina del historial todos los registros de hoy → quedan como pendientes
+  // ── Resetear todas las tareas de hoy (admin) ─────────────────────────────
   const resetearTareasHoy = async () => {
     const fechaHoy = new Date().toISOString().split('T')[0];
     const entradasHoy = historial.filter(h => h.fechaDia === fechaHoy);
@@ -223,14 +239,14 @@ export const useFirestore = () => {
     await batch.commit();
   };
 
-  // ── Leer asignaciones de una fecha ─────────────────────
+  // ── Leer asignaciones de una fecha ───────────────────────────────────────
   const getAsignaciones = async (fecha) => {
     const ref = doc(db, 'hogar_asignaciones', fecha);
     const snap = await getDoc(ref);
     return snap.exists() ? snap.data() : null;
   };
 
-  // ── Guardar asignaciones ────────────────────────────────
+  // ── Guardar asignaciones ─────────────────────────────────────────────────
   const guardarAsignaciones = async (fecha, asignaciones) => {
     await setDoc(doc(db, 'hogar_asignaciones', fecha), asignaciones);
   };
