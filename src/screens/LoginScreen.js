@@ -4,6 +4,7 @@ import {
   StatusBar,
   View,
   Text,
+  Image,
   TouchableOpacity,
   FlatList,
   StyleSheet,
@@ -23,7 +24,7 @@ export const LoginScreen = ({ usuarios, onSelect }) => {
       <SafeAreaView style={styles.safe}>
         <StatusBar barStyle="light-content" backgroundColor={COLORS.bgDark} />
         <View style={styles.container}>
-          <Text style={styles.logo}>🏡</Text>
+          <Image source={require('../../icon.png')} style={styles.logo} resizeMode="contain" />
           <Text style={styles.title}>Hogar Tasks</Text>
           <Text style={styles.subtitle}>Creando usuarios...</Text>
         </View>
@@ -35,7 +36,7 @@ export const LoginScreen = ({ usuarios, onSelect }) => {
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.bgDark} />
       <View style={styles.container}>
-        <Text style={styles.logo}>🏡</Text>
+        <Image source={require('../../icon.png')} style={styles.logo} resizeMode="contain" />
         <Text style={styles.title}>Hogar Tasks</Text>
         <Text style={styles.subtitle}>¿Quién eres?</Text>
 
@@ -66,7 +67,8 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   logo: {
-    fontSize: 80,
+    width: 160,
+    height: 160,
     marginBottom: 16,
   },
   title: {
