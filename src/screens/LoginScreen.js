@@ -11,9 +11,9 @@ import {
 import { COLORS } from '../constants/colors';
 
 const ICONOS = {
-  Daniel: '👕',
-  Sergio: '🍳',
-  Diego:  '🚿',
+  Daniel: '🫅',
+  Sergio: '🧑',
+  Diego:  '🧒',
   Adulto: '👑',
 };
 
@@ -23,7 +23,7 @@ export const LoginScreen = ({ usuarios, onSelect }) => {
       <SafeAreaView style={styles.safe}>
         <StatusBar barStyle="light-content" backgroundColor={COLORS.bgDark} />
         <View style={styles.container}>
-          <Text style={styles.logo}>🏠</Text>
+          <Text style={styles.logo}>🏡</Text>
           <Text style={styles.title}>Hogar Tasks</Text>
           <Text style={styles.subtitle}>Creando usuarios...</Text>
         </View>
@@ -35,18 +35,18 @@ export const LoginScreen = ({ usuarios, onSelect }) => {
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.bgDark} />
       <View style={styles.container}>
-        <Text style={styles.logo}>🏠</Text>
+        <Text style={styles.logo}>🏡</Text>
         <Text style={styles.title}>Hogar Tasks</Text>
         <Text style={styles.subtitle}>¿Quién eres?</Text>
 
         <FlatList
           data={usuarios}
-          keyExtractor={item => item.id}
+          keyExtractor={(item) => item.id}
           style={styles.list}
           renderItem={({ item }) => (
             <TouchableOpacity style={styles.btn} onPress={() => onSelect(item)}>
               <Text style={styles.btnText}>
-                {ICONOS[item.nombre] || '👤'} {item.nombre}
+                {ICONOS[item.nombre] || '🙂'} {item.nombre}
               </Text>
               <Text style={styles.btnPts}>{item.puntos || 0} pts</Text>
             </TouchableOpacity>
@@ -58,14 +58,17 @@ export const LoginScreen = ({ usuarios, onSelect }) => {
 };
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.bg },
+  safe:      { flex: 1, backgroundColor: COLORS.bg },
   container: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
-  logo: { fontSize: 64, marginBottom: 16 },
+  logo: {
+    fontSize: 80,
+    marginBottom: 16,
+  },
   title: {
     color: COLORS.textPrimary,
     fontSize: 32,
@@ -90,5 +93,5 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
   btnText: { color: COLORS.textPrimary, fontSize: 18, fontWeight: '600' },
-  btnPts: { color: COLORS.green, fontSize: 16, fontWeight: '700' },
+  btnPts:  { color: COLORS.green,       fontSize: 16, fontWeight: '700' },
 });
