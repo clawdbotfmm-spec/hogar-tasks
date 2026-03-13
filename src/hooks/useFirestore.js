@@ -160,6 +160,46 @@ export const useFirestore = () => {
     }
   };
 
+  // ── Verificar tarea entre usuarios (peer review) ─────────────────────────
+  const verificarTareaUsuario = async (tarea, aprobada, verificador) => {
+    try {
+      const usuario =
+        usuarios.find(u => u.id === tarea.usuarioId) ||
+        usuarios.find(u => u.nombre === tarea.usuarioNombre);
+      if (!usuario) return;
+
+      if (aprobada) {
+        const fechaHoy = new Date().toISOString().split('T')[0];
+        const tareasHoyVerificadas = historial.filter(h =>
+          h.usuarioId === usuario.id &&
+          h.fechaDia === fechaHoy &&
+          h.estado === 'verificada'
+        );
+        const nuevaRacha =
+          tareasHoyVerificadas.length === 0
+            ? (usuario.racha || 0) + 1
+            : usuario.racha;
+
+        await updateDoc(doc(db, 'hogar_usuarios', usuario.id), {
+          puntos: (usuario.puntos || 0) + tarea.puntos,
+          racha: nuevaRacha,
+        });
+        await updateDoc(doc(db, 'hogar_historial', tarea.id), {
+          estado: 'verificada',
+          verificadoPor: verificador?.nombre || 'usuario',
+        });
+      } else {
+        await updateDoc(doc(db, 'hogar_historial', tarea.id), {
+          estado: 'rechazada',
+          verificadoPor: verificador?.nombre || 'usuario',
+        });
+      }
+    } catch (error) {
+      console.error('Error verifying task (peer):', error);
+      Alert.alert('Error', 'No se pudo verificar la tarea.');
+    }
+  };
+
   // ── Ajustar puntos manualmente (admin) ───────────────────────────────────
   const ajustarPuntos = async (usuarioId, cantidad) => {
     const usuario = usuarios.find(u => u.id === usuarioId);
@@ -281,6 +321,7 @@ export const useFirestore = () => {
     completarTarea,
     deshacerTarea,
     verificarTarea,
+    verificarTareaUsuario,
     ajustarPuntos,
     resetearPuntosUsuario,
     recalcularPuntos,

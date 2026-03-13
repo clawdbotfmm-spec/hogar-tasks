@@ -28,6 +28,7 @@ import { ExtrasTab } from './src/tabs/ExtrasTab';
 import { RankingTab } from './src/tabs/RankingTab';
 import { TiendaTab } from './src/tabs/TiendaTab';
 import { AdminTab } from './src/tabs/AdminTab';
+import { VerificarTab } from './src/tabs/VerificarTab';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -59,6 +60,11 @@ export default function App() {
 
   const handleVerificar = async (tarea, aprobada) => {
     await firestore.verificarTarea(tarea, aprobada);
+  };
+
+  const handleVerificarUsuario = async (tarea, aprobada) => {
+    const verificador = usuarios.find(u => u.id === user?.id) || user;
+    await firestore.verificarTareaUsuario(tarea, aprobada, verificador);
   };
 
   const handleCanjearPremio = (premio) => {
@@ -132,7 +138,15 @@ export default function App() {
       >
         <Header user={userActual} onLogout={() => setUser(null)} />
         <ProgressBar puntos={userActual.puntos || 0} />
-        <TabBar tab={tab} setTab={setTab} isAdmin={userActual.isAdmin} />
+        <TabBar
+          tab={tab}
+          setTab={setTab}
+          isAdmin={userActual.isAdmin}
+          pendientesRevisar={
+            userActual.isAdmin ? 0 :
+            historial.filter(h => h.estado === 'pendiente_verificacion' && h.usuarioId !== userActual.id).length
+          }
+        />
 
         <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
           {tab === 'tareas' && !userActual.isAdmin && (
@@ -153,6 +167,15 @@ export default function App() {
 
           {tab === 'extras' && !userActual.isAdmin && (
             <ExtrasTab user={userActual} onCompletar={handleCompletar} />
+          )}
+
+          {tab === 'revisar' && !userActual.isAdmin && (
+            <VerificarTab
+              user={userActual}
+              usuarios={usuarios}
+              historial={historial}
+              onVerificar={handleVerificarUsuario}
+            />
           )}
 
           {tab === 'ranking' && (
