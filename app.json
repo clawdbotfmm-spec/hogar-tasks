@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Hogar Tasks",
+    "slug": "hogar-tasks",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1e293b"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.hogartasks.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./icon.png",
+        "backgroundColor": "#1e293b"
+      },
+      "package": "com.hogartasks.app"
+    },
+    "web": {
+      "favicon": "./icon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "11f5bcda-4421-4ac8-9b6e-7ee788b8168b"
+      }
+    },
+    "owner": "clawdbotfmm"
+  }
+}

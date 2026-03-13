@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(cmd /c \"dir /b C:\\\\Users\\\\EMBY\\\\Downloads\\\\hogar-tasks-master\\\\node_modules 2>&1\")",
+      "Bash(npm install:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(where npx:*)",
+      "Bash(cmd /c \"where npx 2>&1\")",
+      "Bash(npx expo:*)",
+      "Bash(sed -n '85,110p' \"C:/Users/EMBY/Downloads/hogar-tasks-master/node_modules/@expo/cli/src/start/server/metro/externals.ts\")",
+      "Bash(sed -n '85,110p' \"C:/Users/EMBY/Downloads/hogar-tasks-master/node_modules/@expo/cli/build/start/server/metro/externals.js\")",
+      "Bash(curl -s http://localhost:19006)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:19006)",
+      "Bash(npx --yes kill-port 19006)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:19006/)",
+      "Bash(powershell.exe -Command \"Compress-Archive -Path ''hogar-tasks-master'' -DestinationPath ''C:/Users/EMBY/Desktop/hogar-tasks.zip'' -Force\")",
+      "Read(//c/Users/EMBY/AppData/Local/Android/**)",
+      "Read(//c/Program Files/**)",
+      "Bash(powershell.exe -Command \":*)",
+      "Bash(powershell.exe -Command \"Remove-Item ''C:/Users/EMBY/Desktop/hogar-tasks.zip'' -ErrorAction SilentlyContinue; cd ''C:/Users/EMBY/Downloads/hogar-tasks-master''; Get-ChildItem -Recurse -File | Where-Object { $_FullName -notmatch ''node_modules'' } | ForEach-Object { $_FullName } | Measure-Object | Select-Object -ExpandProperty Count\")",
+      "Bash(explorer.exe \"C:\\\\Users\\\\EMBY\\\\Downloads\\\\hogar-tasks-master\")",
+      "Bash(cmd.exe /c start explorer \"C:\\\\Users\\\\EMBY\\\\Downloads\\\\hogar-tasks-master\")",
+      "Bash(gh auth:*)",
+      "Bash(git --version)",
+      "Bash(git config:*)",
+      "Bash(curl -s https://api.github.com/users/clawdbotfmm-spec)",
+      "Bash(git init:*)",
+      "Bash(.gitignore:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}
