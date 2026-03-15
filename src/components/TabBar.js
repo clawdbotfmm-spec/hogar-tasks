@@ -4,7 +4,6 @@ import { COLORS } from '../constants/colors';
 
 const TABS = [
   { id: 'tareas',  label: '📋 Tareas',  adminOnly: false, hideAdmin: true },
-  { id: 'extras',  label: '⭐ Extras',  adminOnly: false, hideAdmin: true },
   { id: 'lista',   label: '🛒 Lista',   adminOnly: false },
   { id: 'ranking', label: '🏆 Rank',    adminOnly: false },
   { id: 'tienda',  label: '🎁 Tienda',  adminOnly: false, hideAdmin: true },
@@ -42,15 +41,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderLight,
   },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  tabActive: {
-    borderBottomWidth: 3,
-    borderBottomColor: COLORS.blue,
-  },
-  text: { color: COLORS.textSecondary, fontSize: 11, fontWeight: '600' },
+  tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
+  tabActive: { borderBottomWidth: 3, borderBottomColor: COLORS.blue },
+  text: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '600' },
   textActive: { color: COLORS.blue },
 });

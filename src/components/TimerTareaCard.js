@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { COLORS } from '../constants/colors';
 import { TAREAS_CON_TIMER } from '../constants/timers';
+import { confirmar } from '../utils/confirmar';
 
 /**
  * Card de tarea con cronómetro integrado.
@@ -31,13 +32,10 @@ export const TimerTareaCard = ({
 
   const handleCompletar = () => {
     if (!completo) {
-      Alert.alert(
-        `⏱️ ${tarea.nombre} incompleto`,
+      confirmar(
+        `${tarea.nombre} incompleto`,
         `Solo has hecho ${formatearTiempo(segundos)} de ${config.etiqueta}.\n\n¿Completar de todos modos?`,
-        [
-          { text: 'Seguir', style: 'cancel' },
-          { text: 'Completar', onPress: () => { onCompletar(tarea); onReset(tarea.id); } },
-        ]
+        () => { onCompletar(tarea); onReset(tarea.id); }
       );
     } else {
       onCompletar(tarea);

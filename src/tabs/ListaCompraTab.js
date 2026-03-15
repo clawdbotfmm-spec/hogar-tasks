@@ -4,10 +4,10 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  Alert,
   StyleSheet,
 } from 'react-native';
 import { COLORS } from '../constants/colors';
+import { confirmar } from '../utils/confirmar';
 
 export const ListaCompraTab = ({
   user,
@@ -31,13 +31,10 @@ export const ListaCompraTab = ({
 
   const handleLimpiar = () => {
     if (comprados.length === 0) return;
-    Alert.alert(
-      '🗑️ Limpiar comprados',
+    confirmar(
+      'Limpiar comprados',
       `¿Borrar los ${comprados.length} productos ya comprados?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Borrar', style: 'destructive', onPress: onLimpiarComprados },
-      ]
+      onLimpiarComprados
     );
   };
 

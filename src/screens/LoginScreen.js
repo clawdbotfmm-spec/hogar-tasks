@@ -12,7 +12,7 @@ import {
 import { COLORS } from '../constants/colors';
 
 const ICONOS = {
-  Daniel: '🫅',
+  Daniel: '👦',
   Sergio: '🧑',
   Diego:  '🧒',
   Adulto: '👑',
