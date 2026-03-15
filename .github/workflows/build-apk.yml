@@ -16,7 +16,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -28,7 +27,10 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
+
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --clean
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
@@ -36,22 +38,20 @@ jobs:
       - name: Build Release APK
         run: |
           cd android
-          ./gradlew assembleRelease --no-daemon -Pandroid.useAndroidX=true
+          ./gradlew assembleRelease --no-daemon
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
 
-      - name: Sign APK (debug keystore)
+      - name: Find and rename APK
         run: |
-          APK=android/app/build/outputs/apk/release/app-release-unsigned.apk
-          if [ ! -f "$APK" ]; then
-            APK=android/app/build/outputs/apk/release/app-release.apk
+          APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -1)
+          if [ -n "$APK" ]; then
+            cp "$APK" android/app/build/outputs/apk/release/hogar-tasks.apk
           fi
-          keytool -genkey -v -keystore /tmp/debug.keystore -alias androiddebugkey             -keyalg RSA -keysize 2048 -validity 10000             -storepass android -keypass android             -dname "CN=Android Debug,O=Android,C=US"
-          $ANDROID_HOME/build-tools/34.0.0/apksigner sign             --ks /tmp/debug.keystore --ks-pass pass:android --key-pass pass:android             --ks-key-alias androiddebugkey             --out android/app/build/outputs/apk/release/hogar-tasks.apk             "$APK" || cp "$APK" android/app/build/outputs/apk/release/hogar-tasks.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: hogar-tasks-apk
           path: android/app/build/outputs/apk/release/hogar-tasks.apk
-          retention-days: 7
+          retention-days: 30
