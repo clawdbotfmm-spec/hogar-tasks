@@ -26,7 +26,7 @@
       "package": "com.hogartasks.app"
     },
     "web": {
-      "favicon": "./icon.png",
+      "favicon": "./public/favicon.png",
       "name": "Hogar Tasks",
       "shortName": "Hogar",
       "description": "Gestión de tareas del hogar",
