@@ -1,13 +1,13 @@
 import React from 'react';
 import {
-  SafeAreaView,
-  StatusBar,
   View,
+  StatusBar,
   Text,
   Image,
   TouchableOpacity,
   FlatList,
   StyleSheet,
+  Platform,
 } from 'react-native';
 import { COLORS } from '../constants/colors';
 
@@ -21,20 +21,20 @@ const ICONOS = {
 export const LoginScreen = ({ usuarios, onSelect }) => {
   if (usuarios.length === 0) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <StatusBar barStyle="light-content" backgroundColor={COLORS.bgDark} />
+      <View style={styles.safe}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.bgDark} translucent={false} />
         <View style={styles.container}>
           <Image source={require('../../icon.png')} style={styles.logo} resizeMode="contain" />
           <Text style={styles.title}>Hogar Tasks</Text>
           <Text style={styles.subtitle}>Creando usuarios...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.bgDark} />
+    <View style={styles.safe}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.bgDark} translucent={false} />
       <View style={styles.container}>
         <Image source={require('../../icon.png')} style={styles.logo} resizeMode="contain" />
         <Text style={styles.title}>Hogar Tasks</Text>
@@ -54,12 +54,14 @@ export const LoginScreen = ({ usuarios, onSelect }) => {
           )}
         />
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
+const STATUSBAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight || 40) : 50;
+
 const styles = StyleSheet.create({
-  safe:      { flex: 1, backgroundColor: COLORS.bg },
+  safe:      { flex: 1, backgroundColor: COLORS.bg, paddingTop: STATUSBAR_HEIGHT },
   container: {
     flex: 1,
     justifyContent: 'center',

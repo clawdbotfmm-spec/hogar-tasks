@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  SafeAreaView,
+  View,
   StatusBar,
   ScrollView,
   KeyboardAvoidingView,
@@ -159,8 +159,8 @@ export default function App() {
   const pendientesVerif = firestore.getPendientesDeOtros(userActual.id);
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.bgDark} />
+    <View style={styles.safe}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.bgDark} translucent={false} />
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -238,12 +238,14 @@ export default function App() {
           />
         )}
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
+const STATUSBAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight || 40) : 50;
+
 const styles = StyleSheet.create({
-  safe:      { flex: 1, backgroundColor: COLORS.bg },
+  safe:      { flex: 1, backgroundColor: COLORS.bgDark, paddingTop: STATUSBAR_HEIGHT },
   container: { flex: 1, backgroundColor: COLORS.bg },
   scroll:    { flex: 1 },
 });
