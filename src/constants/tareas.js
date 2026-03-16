@@ -39,7 +39,7 @@ export const COCINA_OCASIONAL = [
 
 // ── CASA GENERAL — CADA DÍA ─────────────────────────────
 export const CASA_DIARIA = [
-  { id: 'hacer_cama',       nombre: 'Hacer la cama',               puntos: 2, frecuencia: 'diaria', categoria: 'casa' },
+  { id: 'hacer_cama_matrim', nombre: 'Hacer cama matrimonio',       puntos: 3, frecuencia: 'diaria', categoria: 'casa' },
   { id: 'echar_llave',      nombre: 'Echar la llave por la noche', puntos: 1, frecuencia: 'diaria', categoria: 'casa' },
   { id: 'ordenar_mochilas', nombre: 'Ordenar armario mochilas',    puntos: 2, frecuencia: 'diaria', categoria: 'casa' },
   { id: 'subir_persianas',  nombre: 'Subir persianas',             puntos: 2, frecuencia: 'diaria', categoria: 'casa' },
@@ -100,13 +100,17 @@ export const TAPERS = [
 
 // ── PERSONALES ───────────────────────────────────────────
 export const TAREAS_PERSONALES = [
-  { id: 'lavarse_dientes',  nombre: 'Lavarse los dientes',          puntos: 2, frecuencia: 'diaria', maxVeces: 3, categoria: 'personal' },
-  { id: 'ducha',            nombre: 'Ducha',                        puntos: 3, frecuencia: 'diaria', categoria: 'personal' },
-  { id: 'ejercicio',        nombre: 'Ejercicio 30 minutos',         puntos: 5, frecuencia: 'diaria', categoria: 'personal' },
-  { id: 'leer_30min',       nombre: 'Leer 30 minutos',              puntos: 5, frecuencia: 'diaria', categoria: 'personal' },
-  { id: 'cortar_pelo',      nombre: 'Cortarse el pelo',             puntos: 8, frecuencia: 'segun_necesidad', categoria: 'personal' },
-  { id: 'cortar_unas_manos',nombre: 'Cortarse uñas de las manos',   puntos: 3, frecuencia: 'segun_necesidad', categoria: 'personal' },
-  { id: 'cortar_unas_pies', nombre: 'Cortarse uñas de los pies',    puntos: 3, frecuencia: 'segun_necesidad', categoria: 'personal' },
+  { id: 'hacer_mi_cama',      nombre: 'Hacer mi cama',                puntos: 2, frecuencia: 'diaria', categoria: 'personal' },
+  { id: 'colocar_pijama',     nombre: 'Colocar pijama',               puntos: 1, frecuencia: 'diaria', categoria: 'personal' },
+  { id: 'recoger_ropa_suelo', nombre: 'Recoger ropa del suelo',       puntos: 2, frecuencia: 'diaria', categoria: 'personal' },
+  { id: 'limpiar_escritorio', nombre: 'Limpiar escritorio',            puntos: 3, frecuencia: 'diaria', categoria: 'personal' },
+  { id: 'lavarse_dientes',    nombre: 'Lavarse los dientes',          puntos: 2, frecuencia: 'diaria', maxVeces: 3, categoria: 'personal' },
+  { id: 'ducha',              nombre: 'Ducha',                        puntos: 3, frecuencia: 'diaria', categoria: 'personal' },
+  { id: 'ejercicio',          nombre: 'Ejercicio 30 minutos',         puntos: 5, frecuencia: 'diaria', categoria: 'personal' },
+  { id: 'leer_30min',         nombre: 'Leer 30 minutos',              puntos: 5, frecuencia: 'diaria', categoria: 'personal' },
+  { id: 'cortar_pelo',        nombre: 'Cortarse el pelo',             puntos: 8, frecuencia: 'segun_necesidad', categoria: 'personal' },
+  { id: 'cortar_unas_manos',  nombre: 'Cortarse uñas de las manos',  puntos: 3, frecuencia: 'segun_necesidad', categoria: 'personal' },
+  { id: 'cortar_unas_pies',   nombre: 'Cortarse uñas de los pies',   puntos: 3, frecuencia: 'segun_necesidad', categoria: 'personal' },
 ];
 
 // ── EXTRAS (voluntarias, puntos bonus) ───────────────────
