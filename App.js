@@ -242,7 +242,7 @@ export default function App() {
   );
 }
 
-const STATUSBAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight || 40) : 50;
+const STATUSBAR_HEIGHT = Platform.OS === 'web' ? 0 : Platform.OS === 'android' ? (StatusBar.currentHeight || 40) : 50;
 
 const styles = StyleSheet.create({
   safe:      { flex: 1, backgroundColor: COLORS.bgDark, paddingTop: STATUSBAR_HEIGHT },

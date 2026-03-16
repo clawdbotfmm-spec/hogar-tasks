@@ -2,7 +2,7 @@
   "expo": {
     "name": "Hogar Tasks",
     "slug": "hogar-tasks",
-    "version": "1.0.0",
+    "version": "2.3.0",
     "orientation": "portrait",
     "icon": "./icon.png",
     "userInterfaceStyle": "dark",
@@ -26,7 +26,16 @@
       "package": "com.hogartasks.app"
     },
     "web": {
-      "favicon": "./icon.png"
+      "favicon": "./icon.png",
+      "name": "Hogar Tasks",
+      "shortName": "Hogar",
+      "description": "Gestión de tareas del hogar",
+      "backgroundColor": "#1e293b",
+      "themeColor": "#0f172a",
+      "lang": "es",
+      "display": "standalone",
+      "startUrl": "/",
+      "bundler": "metro"
     },
     "extra": {
       "eas": {
