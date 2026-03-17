@@ -32,13 +32,13 @@ jobs:
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H ${{ secrets.SYNOLOGY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Deploy via rsync
         run: |
           rsync -avz --delete \
-            -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no" \
+            -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o PasswordAuthentication=no" \
             dist/ \
             ${{ secrets.SYNOLOGY_USER }}@${{ secrets.SYNOLOGY_HOST }}:/volume1/hogar-tasks/
