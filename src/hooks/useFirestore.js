@@ -22,7 +22,7 @@ const firebaseConfig = {
   projectId: 'banco-bus',
   storageBucket: 'banco-bus.appspot.com',
   messagingSenderId: '558242160979',
-  appId: 'banco-bus',
+  appId: '1:558242160979:web:REEMPLAZA_CON_TU_APP_ID',
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
