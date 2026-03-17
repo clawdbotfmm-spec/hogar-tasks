@@ -35,7 +35,7 @@ export default function App() {
   const penalizacionChecked             = useRef(false);
 
   const firestore = useFirestore();
-  const { usuarios, historial, listaCompra, tareasCustom, loading } = firestore;
+  const { usuarios, historial, listaCompra, tareasCustom, tareasOcultas, loading } = firestore;
 
   const { timerSegundos, timersActivos, formatearTiempo, toggleTimer, resetearTimer } =
     useTimers();
@@ -175,6 +175,7 @@ export default function App() {
               user={userActual}
               historial={historial}
               tareasCustom={tareasCustom}
+              tareasOcultas={tareasOcultas}
               onCompletar={handleCompletar}
               onDeshacer={handleDeshacer}
               onVerificar={handleVerificar}
@@ -230,6 +231,9 @@ export default function App() {
               tareasCustom={tareasCustom}
               onAgregarTareaCustom={firestore.agregarTareaCustom}
               onBorrarTareaCustom={firestore.borrarTareaCustom}
+              tareasOcultas={tareasOcultas}
+              onOcultarTarea={firestore.ocultarTarea}
+              onRestaurarTarea={firestore.restaurarTarea}
             />
           )}
         </ScrollView>

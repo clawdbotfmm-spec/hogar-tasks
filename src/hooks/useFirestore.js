@@ -53,6 +53,7 @@ export const useFirestore = () => {
   const [listaCompra, setListaCompra] = useState([]);
   const [loading, setLoading]         = useState(true);
   const [tareasCustom, setTareasCustom] = useState([]);
+  const [tareasOcultas, setTareasOcultas] = useState([]);
 
   useEffect(() => {
     // Usuarios
@@ -86,11 +87,18 @@ export const useFirestore = () => {
       (snap) => setTareasCustom(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     );
 
+    // Tareas ocultas (IDs de tareas estáticas desactivadas)
+    const unsubTareasOcultas = onSnapshot(
+      doc(db, 'hogar_config', 'tareas_ocultas'),
+      (snap) => setTareasOcultas(snap.exists() ? (snap.data().ids || []) : [])
+    );
+
     return () => {
       unsubUsuarios();
       unsubHistorial();
       unsubLista();
       unsubTareasCustom();
+      unsubTareasOcultas();
     };
   }, []);
 
@@ -420,6 +428,19 @@ export const useFirestore = () => {
     );
   };
 
+  // ── Tareas ocultas (admin) ────────────────────────────────────────────
+  const ocultarTarea = async (tareaId) => {
+    const ref = doc(db, 'hogar_config', 'tareas_ocultas');
+    const nuevas = [...new Set([...tareasOcultas, tareaId])];
+    await setDoc(ref, { ids: nuevas });
+  };
+
+  const restaurarTarea = async (tareaId) => {
+    const ref = doc(db, 'hogar_config', 'tareas_ocultas');
+    const nuevas = tareasOcultas.filter(id => id !== tareaId);
+    await setDoc(ref, { ids: nuevas });
+  };
+
   // ── Tareas custom (admin) ─────────────────────────────────────────────
   const agregarTareaCustom = async (tarea) => {
     await addDoc(collection(db, 'hogar_tareas_custom'), {
@@ -466,5 +487,8 @@ export const useFirestore = () => {
     tareasCustom,
     agregarTareaCustom,
     borrarTareaCustom,
+    tareasOcultas,
+    ocultarTarea,
+    restaurarTarea,
   };
 };

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, TextInput, Modal, StyleSheet, Platform } from 'react-native';
 import { COLORS } from '../constants/colors';
+import { SECCIONES_TAREAS, TAREAS_PERSONALES, TAREAS_EXTRAS, PROYECTOS_CASA } from '../constants/tareas';
 import { getNivel } from '../constants/niveles';
 import { PUNTOS_POR_HORA } from '../constants/tareas';
 import { confirmar } from '../utils/confirmar';
@@ -20,6 +21,9 @@ export const AdminTab = ({
   tareasCustom = [],
   onAgregarTareaCustom,
   onBorrarTareaCustom,
+  tareasOcultas = [],
+  onOcultarTarea,
+  onRestaurarTarea,
 }) => {
   const [modalUsuario, setModalUsuario] = useState(null);
   const [inputPuntos, setInputPuntos]   = useState('');
@@ -28,6 +32,7 @@ export const AdminTab = ({
   const [nuevaTareaPuntos, setNuevaTareaPuntos] = useState('');
   const [nuevaTareaMaxVeces, setNuevaTareaMaxVeces] = useState('1');
   const [nuevaTareaFrecuencia, setNuevaTareaFrecuencia] = useState('diaria');
+  const [busquedaTarea, setBusquedaTarea] = useState('');
 
   const pendientes = historial.filter(h => h.estado === 'pendiente_verificacion');
   const usuariosActivos = usuarios.filter(u => !u.isAdmin);
@@ -64,6 +69,55 @@ export const AdminTab = ({
             </View>
           ))
         )}
+      </View>
+
+      {/* Mantenimiento */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>🔧 Mantenimiento</Text>
+
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.actionBtnDanger]}
+          onPress={() => confirmar(
+            'Resetear tareas de hoy',
+            'Se eliminarán TODOS los registros de hoy. Las tareas vuelven a pendientes.',
+            onResetearHoy
+          )}
+        >
+          <Text style={styles.actionBtnText}>🗑️ Resetear tareas de hoy</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.actionBtnSecondary]}
+          onPress={() => confirmar(
+            'Recalcular puntos',
+            'Recalcula puntos desde el historial verificado.',
+            onRecalcular
+          )}
+        >
+          <Text style={styles.actionBtnText}>🔄 Recalcular puntos</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.actionBtnDanger]}
+          onPress={() => confirmar(
+            'RESET TOTAL',
+            'Se pondrán TODOS los puntos, rachas, horas y boosters a 0 para todos los usuarios.',
+            onResetearTodos
+          )}
+        >
+          <Text style={styles.actionBtnText}>⚠️ Reset total de puntos</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.actionBtnDanger]}
+          onPress={() => confirmar(
+            'BORRAR TODO EL HISTORIAL',
+            'Se borrará TODO el historial de tareas. Esta acción no se puede deshacer.',
+            onBorrarHistorial
+          )}
+        >
+          <Text style={styles.actionBtnText}>⚠️ Borrar todo el historial</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Resumen usuarios + horas */}
@@ -152,40 +206,92 @@ export const AdminTab = ({
         </View>
       </Modal>
 
-      {/* Gestionar tareas custom */}
+      {/* Gestionar TODAS las tareas */}
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>🛠️ Tareas personalizadas</Text>
+          <Text style={styles.cardTitle}>🛠️ Gestionar tareas</Text>
           <TouchableOpacity style={styles.btnAddTarea} onPress={() => setModalTarea(true)}>
-            <Text style={styles.btnAddTareaText}>+ Añadir</Text>
+            <Text style={styles.btnAddTareaText}>+ Nueva</Text>
           </TouchableOpacity>
         </View>
-        {tareasCustom.length === 0 ? (
-          <Text style={styles.empty}>No hay tareas personalizadas. Pulsa "+ Añadir" para crear una.</Text>
-        ) : (
-          tareasCustom.map(t => (
-            <View key={t.id} style={styles.tareaCustomCard}>
-              <View style={styles.tareaCustomInfo}>
-                <Text style={styles.tareaCustomNombre}>{t.nombre}</Text>
-                <Text style={styles.tareaCustomMeta}>
-                  {t.puntos} pts · máx {t.maxVeces}x · {t.frecuencia}
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.btnBorrarTarea}
-                onPress={() => confirmar(
-                  'Borrar tarea',
-                  `¿Eliminar "${t.nombre}"?`,
-                  () => onBorrarTareaCustom(t.id)
-                )}
-              >
-                <Text style={styles.btnBorrarTareaText}>🗑️</Text>
-              </TouchableOpacity>
+
+        {/* Buscador */}
+        <TextInput
+          style={styles.searchInput}
+          placeholder="🔍 Buscar tarea..."
+          placeholderTextColor={COLORS.textMuted}
+          value={busquedaTarea}
+          onChangeText={setBusquedaTarea}
+        />
+
+        {/* Tareas estáticas por sección */}
+        {[
+          ...SECCIONES_TAREAS,
+          { key: 'personal', titulo: '🧑 Personales', tareas: TAREAS_PERSONALES },
+          { key: 'extras', titulo: '⚡ Extras', tareas: TAREAS_EXTRAS },
+          { key: 'proyectos', titulo: '🔨 Proyectos', tareas: PROYECTOS_CASA },
+        ].map(sec => {
+          const tareasFiltradas = sec.tareas.filter(t =>
+            !busquedaTarea || t.nombre.toLowerCase().includes(busquedaTarea.toLowerCase())
+          );
+          if (tareasFiltradas.length === 0) return null;
+          return (
+            <View key={sec.key} style={styles.seccionTareas}>
+              <Text style={styles.seccionTitulo}>{sec.titulo}</Text>
+              {tareasFiltradas.map(t => {
+                const oculta = tareasOcultas.includes(t.id);
+                return (
+                  <View key={t.id} style={[styles.tareaCustomCard, oculta && styles.tareaOculta]}>
+                    <View style={styles.tareaCustomInfo}>
+                      <Text style={[styles.tareaCustomNombre, oculta && styles.tareaOcultaText]}>{t.nombre}</Text>
+                      <Text style={styles.tareaCustomMeta}>{t.puntos} pts</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.btnToggleTarea, oculta ? styles.btnRestaurar : styles.btnOcultar]}
+                      onPress={() => oculta ? onRestaurarTarea(t.id) : confirmar(
+                        'Ocultar tarea',
+                        `¿Ocultar "${t.nombre}" para todos?`,
+                        () => onOcultarTarea(t.id)
+                      )}
+                    >
+                      <Text style={styles.btnToggleTareaText}>{oculta ? '👁️' : '🙈'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
             </View>
-          ))
+          );
+        })}
+
+        {/* Tareas custom añadidas */}
+        {tareasCustom.filter(t =>
+          !busquedaTarea || t.nombre.toLowerCase().includes(busquedaTarea.toLowerCase())
+        ).length > 0 && (
+          <View style={styles.seccionTareas}>
+            <Text style={styles.seccionTitulo}>⭐ Personalizadas</Text>
+            {tareasCustom.filter(t =>
+              !busquedaTarea || t.nombre.toLowerCase().includes(busquedaTarea.toLowerCase())
+            ).map(t => (
+              <View key={t.id} style={styles.tareaCustomCard}>
+                <View style={styles.tareaCustomInfo}>
+                  <Text style={styles.tareaCustomNombre}>{t.nombre}</Text>
+                  <Text style={styles.tareaCustomMeta}>{t.puntos} pts · máx {t.maxVeces}x · {t.frecuencia}</Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.btnToggleTarea, styles.btnOcultar]}
+                  onPress={() => confirmar(
+                    'Borrar tarea',
+                    `¿Eliminar "${t.nombre}"?`,
+                    () => onBorrarTareaCustom(t.id)
+                  )}
+                >
+                  <Text style={styles.btnToggleTareaText}>🗑️</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
         )}
       </View>
-
       {/* Modal añadir tarea custom */}
       <Modal
         visible={modalTarea}
@@ -265,54 +371,7 @@ export const AdminTab = ({
         </View>
       </Modal>
 
-      {/* Mantenimiento */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>🔧 Mantenimiento</Text>
 
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.actionBtnDanger]}
-          onPress={() => confirmar(
-            'Resetear tareas de hoy',
-            'Se eliminarán TODOS los registros de hoy. Las tareas vuelven a pendientes.',
-            onResetearHoy
-          )}
-        >
-          <Text style={styles.actionBtnText}>🗑️ Resetear tareas de hoy</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.actionBtnSecondary]}
-          onPress={() => confirmar(
-            'Recalcular puntos',
-            'Recalcula puntos desde el historial verificado.',
-            onRecalcular
-          )}
-        >
-          <Text style={styles.actionBtnText}>🔄 Recalcular puntos</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.actionBtnDanger]}
-          onPress={() => confirmar(
-            'RESET TOTAL',
-            'Se pondrán TODOS los puntos, rachas, horas y boosters a 0 para todos los usuarios.',
-            onResetearTodos
-          )}
-        >
-          <Text style={styles.actionBtnText}>⚠️ Reset total de puntos</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.actionBtnDanger]}
-          onPress={() => confirmar(
-            'BORRAR TODO EL HISTORIAL',
-            'Se borrará TODO el historial de tareas. Esta acción no se puede deshacer.',
-            onBorrarHistorial
-          )}
-        >
-          <Text style={styles.actionBtnText}>⚠️ Borrar todo el historial</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 };
@@ -373,20 +432,31 @@ const styles = StyleSheet.create({
   actionBtnDanger: { backgroundColor: COLORS.red },
   actionBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
 
-  // Tareas custom
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  // Gestión de tareas
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   btnAddTarea: { backgroundColor: COLORS.blue, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 6 },
   btnAddTareaText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  searchInput: {
+    backgroundColor: COLORS.cardInner, borderRadius: 10, borderWidth: 1,
+    borderColor: COLORS.border, color: COLORS.textPrimary, fontSize: 14,
+    padding: 10, marginBottom: 12,
+  },
+  seccionTareas: { marginBottom: 8 },
+  seccionTitulo: { color: COLORS.yellow, fontSize: 13, fontWeight: '700', marginBottom: 6, marginTop: 4 },
   tareaCustomCard: {
-    backgroundColor: COLORS.cardInner, borderRadius: 12, padding: 14, marginBottom: 8,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: COLORS.cardInner, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
+    marginBottom: 4, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     borderWidth: 1, borderColor: COLORS.border,
   },
+  tareaOculta: { opacity: 0.4 },
   tareaCustomInfo: { flex: 1 },
-  tareaCustomNombre: { color: COLORS.textPrimary, fontSize: 15, fontWeight: '600' },
-  tareaCustomMeta: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
-  btnBorrarTarea: { padding: 6 },
-  btnBorrarTareaText: { fontSize: 20 },
+  tareaCustomNombre: { color: COLORS.textPrimary, fontSize: 14, fontWeight: '500' },
+  tareaOcultaText: { textDecorationLine: 'line-through', color: COLORS.textMuted },
+  tareaCustomMeta: { color: COLORS.textSecondary, fontSize: 11, marginTop: 1 },
+  btnToggleTarea: { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginLeft: 8 },
+  btnOcultar: { backgroundColor: 'rgba(239,68,68,0.15)' },
+  btnRestaurar: { backgroundColor: 'rgba(34,197,94,0.15)' },
+  btnToggleTareaText: { fontSize: 16 },
   frecuenciaRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
   frecuenciaBtn: { flex: 1, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, padding: 10, alignItems: 'center' },
   frecuenciaBtnActive: { backgroundColor: COLORS.blue, borderColor: COLORS.blue },

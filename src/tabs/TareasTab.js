@@ -200,11 +200,13 @@ export const TareasTab = ({
 
   if (modo === 'casa') {
     SECCIONES_TAREAS.forEach(sec => {
-      const tareasEnriquecidas = sec.tareas.map(t =>
-        enriquecerTarea(t, user.id, historial, false)
-      );
-      secciones.push({ ...sec, tareas: tareasEnriquecidas });
-      todasTareas.push(...tareasEnriquecidas);
+      const tareasEnriquecidas = sec.tareas
+        .filter(t => !tareasOcultas.includes(t.id))
+        .map(t => enriquecerTarea(t, user.id, historial, false));
+      if (tareasEnriquecidas.length > 0) {
+        secciones.push({ ...sec, tareas: tareasEnriquecidas });
+        todasTareas.push(...tareasEnriquecidas);
+      }
     });
     // Tareas personalizadas del admin
     if (tareasCustom.length > 0) {
@@ -215,9 +217,9 @@ export const TareasTab = ({
       todasTareas.push(...customEnriquecidas);
     }
   } else {
-    const personales = TAREAS_PERSONALES.map(t =>
-      enriquecerTarea(t, user.id, historial, true)
-    );
+    const personales = TAREAS_PERSONALES
+      .filter(t => !tareasOcultas.includes(t.id))
+      .map(t => enriquecerTarea(t, user.id, historial, true));
     secciones = [{ key: 'personal', titulo: '🧑 Mis tareas personales', tareas: personales }];
     todasTareas = personales;
   }
