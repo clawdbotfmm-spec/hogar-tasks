@@ -52,6 +52,7 @@ export const useFirestore = () => {
   const [historial, setHistorial]     = useState([]);
   const [listaCompra, setListaCompra] = useState([]);
   const [loading, setLoading]         = useState(true);
+  const [tareasCustom, setTareasCustom] = useState([]);
 
   useEffect(() => {
     // Usuarios
@@ -79,10 +80,17 @@ export const useFirestore = () => {
       (snap) => setListaCompra(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     );
 
+    // Tareas custom del admin
+    const unsubTareasCustom = onSnapshot(
+      collection(db, 'hogar_tareas_custom'),
+      (snap) => setTareasCustom(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    );
+
     return () => {
       unsubUsuarios();
       unsubHistorial();
       unsubLista();
+      unsubTareasCustom();
     };
   }, []);
 
@@ -412,6 +420,22 @@ export const useFirestore = () => {
     );
   };
 
+  // ── Tareas custom (admin) ─────────────────────────────────────────────
+  const agregarTareaCustom = async (tarea) => {
+    await addDoc(collection(db, 'hogar_tareas_custom'), {
+      nombre: tarea.nombre.trim(),
+      puntos: tarea.puntos,
+      categoria: tarea.categoria || 'extra',
+      frecuencia: tarea.frecuencia || 'diaria',
+      maxVeces: tarea.maxVeces || 1,
+      creado: new Date().toISOString(),
+    });
+  };
+
+  const borrarTareaCustom = async (tareaId) => {
+    await deleteDoc(doc(db, 'hogar_tareas_custom', tareaId));
+  };
+
   return {
     usuarios,
     historial,
@@ -439,5 +463,8 @@ export const useFirestore = () => {
     getPuntosVerificadosDia,
     comprobarPenalizacionAyer,
     getPendientesDeOtros,
+    tareasCustom,
+    agregarTareaCustom,
+    borrarTareaCustom,
   };
 };

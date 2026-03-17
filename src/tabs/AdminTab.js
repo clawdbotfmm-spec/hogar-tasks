@@ -17,9 +17,17 @@ export const AdminTab = ({
   onBorrarHistorial,
   getHorasHoy,
   getHorasSemana,
+  tareasCustom = [],
+  onAgregarTareaCustom,
+  onBorrarTareaCustom,
 }) => {
   const [modalUsuario, setModalUsuario] = useState(null);
   const [inputPuntos, setInputPuntos]   = useState('');
+  const [modalTarea, setModalTarea]     = useState(false);
+  const [nuevaTareaNombre, setNuevaTareaNombre] = useState('');
+  const [nuevaTareaPuntos, setNuevaTareaPuntos] = useState('');
+  const [nuevaTareaMaxVeces, setNuevaTareaMaxVeces] = useState('1');
+  const [nuevaTareaFrecuencia, setNuevaTareaFrecuencia] = useState('diaria');
 
   const pendientes = historial.filter(h => h.estado === 'pendiente_verificacion');
   const usuariosActivos = usuarios.filter(u => !u.isAdmin);
@@ -144,6 +152,119 @@ export const AdminTab = ({
         </View>
       </Modal>
 
+      {/* Gestionar tareas custom */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>🛠️ Tareas personalizadas</Text>
+          <TouchableOpacity style={styles.btnAddTarea} onPress={() => setModalTarea(true)}>
+            <Text style={styles.btnAddTareaText}>+ Añadir</Text>
+          </TouchableOpacity>
+        </View>
+        {tareasCustom.length === 0 ? (
+          <Text style={styles.empty}>No hay tareas personalizadas. Pulsa "+ Añadir" para crear una.</Text>
+        ) : (
+          tareasCustom.map(t => (
+            <View key={t.id} style={styles.tareaCustomCard}>
+              <View style={styles.tareaCustomInfo}>
+                <Text style={styles.tareaCustomNombre}>{t.nombre}</Text>
+                <Text style={styles.tareaCustomMeta}>
+                  {t.puntos} pts · máx {t.maxVeces}x · {t.frecuencia}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.btnBorrarTarea}
+                onPress={() => confirmar(
+                  'Borrar tarea',
+                  `¿Eliminar "${t.nombre}"?`,
+                  () => onBorrarTareaCustom(t.id)
+                )}
+              >
+                <Text style={styles.btnBorrarTareaText}>🗑️</Text>
+              </TouchableOpacity>
+            </View>
+          ))
+        )}
+      </View>
+
+      {/* Modal añadir tarea custom */}
+      <Modal
+        visible={modalTarea}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalTarea(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>➕ Nueva tarea</Text>
+
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Nombre de la tarea"
+              placeholderTextColor={COLORS.textMuted}
+              value={nuevaTareaNombre}
+              onChangeText={setNuevaTareaNombre}
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Puntos (ej: 5)"
+              placeholderTextColor={COLORS.textMuted}
+              keyboardType="numeric"
+              value={nuevaTareaPuntos}
+              onChangeText={setNuevaTareaPuntos}
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Máx veces por día (ej: 1)"
+              placeholderTextColor={COLORS.textMuted}
+              keyboardType="numeric"
+              value={nuevaTareaMaxVeces}
+              onChangeText={setNuevaTareaMaxVeces}
+            />
+
+            <View style={styles.frecuenciaRow}>
+              {['diaria', 'ocasional'].map(f => (
+                <TouchableOpacity
+                  key={f}
+                  style={[styles.frecuenciaBtn, nuevaTareaFrecuencia === f && styles.frecuenciaBtnActive]}
+                  onPress={() => setNuevaTareaFrecuencia(f)}
+                >
+                  <Text style={[styles.frecuenciaBtnText, nuevaTareaFrecuencia === f && styles.frecuenciaBtnTextActive]}>
+                    {f === 'diaria' ? '📅 Diaria' : '📆 Ocasional'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.modalBtns}>
+              <TouchableOpacity
+                style={styles.modalBtnOk}
+                onPress={() => {
+                  const pts = parseInt(nuevaTareaPuntos, 10);
+                  const max = parseInt(nuevaTareaMaxVeces, 10) || 1;
+                  if (!nuevaTareaNombre.trim() || isNaN(pts) || pts <= 0) return;
+                  onAgregarTareaCustom({
+                    nombre: nuevaTareaNombre,
+                    puntos: pts,
+                    maxVeces: max,
+                    frecuencia: nuevaTareaFrecuencia,
+                  });
+                  setNuevaTareaNombre('');
+                  setNuevaTareaPuntos('');
+                  setNuevaTareaMaxVeces('1');
+                  setNuevaTareaFrecuencia('diaria');
+                  setModalTarea(false);
+                }}
+              >
+                <Text style={styles.modalBtnText}>Crear tarea</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setModalTarea(false)}>
+                <Text style={styles.modalBtnText}>Cancelar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Mantenimiento */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>🔧 Mantenimiento</Text>
@@ -251,4 +372,24 @@ const styles = StyleSheet.create({
   actionBtnSecondary: { backgroundColor: COLORS.textMuted },
   actionBtnDanger: { backgroundColor: COLORS.red },
   actionBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+
+  // Tareas custom
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  btnAddTarea: { backgroundColor: COLORS.blue, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 6 },
+  btnAddTareaText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  tareaCustomCard: {
+    backgroundColor: COLORS.cardInner, borderRadius: 12, padding: 14, marginBottom: 8,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    borderWidth: 1, borderColor: COLORS.border,
+  },
+  tareaCustomInfo: { flex: 1 },
+  tareaCustomNombre: { color: COLORS.textPrimary, fontSize: 15, fontWeight: '600' },
+  tareaCustomMeta: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
+  btnBorrarTarea: { padding: 6 },
+  btnBorrarTareaText: { fontSize: 20 },
+  frecuenciaRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  frecuenciaBtn: { flex: 1, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, padding: 10, alignItems: 'center' },
+  frecuenciaBtnActive: { backgroundColor: COLORS.blue, borderColor: COLORS.blue },
+  frecuenciaBtnText: { color: COLORS.textSecondary, fontSize: 13 },
+  frecuenciaBtnTextActive: { color: '#fff', fontWeight: '700' },
 });

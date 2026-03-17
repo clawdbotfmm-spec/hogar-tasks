@@ -35,7 +35,7 @@ export default function App() {
   const penalizacionChecked             = useRef(false);
 
   const firestore = useFirestore();
-  const { usuarios, historial, listaCompra, loading } = firestore;
+  const { usuarios, historial, listaCompra, tareasCustom, loading } = firestore;
 
   const { timerSegundos, timersActivos, formatearTiempo, toggleTimer, resetearTimer } =
     useTimers();
@@ -174,6 +174,7 @@ export default function App() {
             <TareasTab
               user={userActual}
               historial={historial}
+              tareasCustom={tareasCustom}
               onCompletar={handleCompletar}
               onDeshacer={handleDeshacer}
               onVerificar={handleVerificar}
@@ -226,6 +227,9 @@ export default function App() {
               onBorrarHistorial={firestore.borrarTodoHistorial}
               getHorasHoy={firestore.getHorasHoy}
               getHorasSemana={firestore.getHorasSemana}
+              tareasCustom={tareasCustom}
+              onAgregarTareaCustom={firestore.agregarTareaCustom}
+              onBorrarTareaCustom={firestore.borrarTareaCustom}
             />
           )}
         </ScrollView>

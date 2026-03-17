@@ -206,6 +206,14 @@ export const TareasTab = ({
       secciones.push({ ...sec, tareas: tareasEnriquecidas });
       todasTareas.push(...tareasEnriquecidas);
     });
+    // Tareas personalizadas del admin
+    if (tareasCustom.length > 0) {
+      const customEnriquecidas = tareasCustom.map(t =>
+        enriquecerTarea(t, user.id, historial, false)
+      );
+      secciones.push({ key: 'custom', titulo: '⭐ Extras', tareas: customEnriquecidas });
+      todasTareas.push(...customEnriquecidas);
+    }
   } else {
     const personales = TAREAS_PERSONALES.map(t =>
       enriquecerTarea(t, user.id, historial, true)
