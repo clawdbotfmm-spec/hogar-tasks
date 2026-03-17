@@ -41,4 +41,4 @@ jobs:
           rsync -avz --delete \
             -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no" \
             dist/ \
-            ${{ secrets.SYNOLOGY_USER }}@${{ secrets.SYNOLOGY_HOST }}:/volume1/web/hogar-tasks/
+            ${{ secrets.SYNOLOGY_USER }}@${{ secrets.SYNOLOGY_HOST }}:/volume1/hogar-tasks/
