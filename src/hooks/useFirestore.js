@@ -17,12 +17,12 @@ import {
 import { PUNTOS_POR_HORA, PUNTOS_MINIMOS_DIA } from '../constants/tareas';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyB_rld0G77nmfOw-FmfftDPdsWlblPZb24',
-  authDomain: 'banco-bus.firebaseapp.com',
-  projectId: 'banco-bus',
-  storageBucket: 'banco-bus.appspot.com',
-  messagingSenderId: '558242160979',
-  appId: '1:558242160979:web:REEMPLAZA_CON_TU_APP_ID',
+  apiKey: 'AIzaSyBT76DLdmAj423rYXKS2wm2sfD1YgNKg90',
+  authDomain: 'hogar-tasks.firebaseapp.com',
+  projectId: 'hogar-tasks',
+  storageBucket: 'hogar-tasks.firebasestorage.app',
+  messagingSenderId: '180454454918',
+  appId: '1:180454454918:web:662f77f9d40c627e8d4307',
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
