@@ -29,7 +29,7 @@
       "favicon": "./public/favicon.png",
       "name": "Hogar Tasks",
       "shortName": "Hogar",
-      "description": "Gestión de tareas del hogar",
+      "description": "Gesti\u00f3n de tareas del hogar",
       "backgroundColor": "#1e293b",
       "themeColor": "#0f172a",
       "lang": "es",
@@ -42,6 +42,9 @@
         "projectId": "11f5bcda-4421-4ac8-9b6e-7ee788b8168b"
       }
     },
-    "owner": "clawdbotfmm"
+    "owner": "clawdbotfmm",
+    "experiments": {
+      "baseUrl": "/hogar-tasks"
+    }
   }
 }
