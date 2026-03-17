@@ -191,6 +191,8 @@ export const TareasTab = ({
   formatearTiempo,
   onToggleTimer,
   onResetTimer,
+  tareasCustom = [],
+  tareasOcultas = [],
 }) => {
   const [subTab, setSubTab] = useState('pendientes');
   const [modo, setModo]     = useState('casa');

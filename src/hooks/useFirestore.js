@@ -90,7 +90,14 @@ export const useFirestore = () => {
     // Tareas ocultas (IDs de tareas estáticas desactivadas)
     const unsubTareasOcultas = onSnapshot(
       doc(db, 'hogar_config', 'tareas_ocultas'),
-      (snap) => setTareasOcultas(snap.exists() ? (snap.data().ids || []) : [])
+      (snap) => {
+        try {
+          setTareasOcultas(snap.exists() ? (snap.data().ids || []) : []);
+        } catch (e) {
+          setTareasOcultas([]);
+        }
+      },
+      () => setTareasOcultas([])
     );
 
     return () => {
