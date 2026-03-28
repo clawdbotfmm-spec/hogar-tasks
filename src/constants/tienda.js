@@ -85,14 +85,6 @@ export const BOOSTERS_ESPECIALES = [
     tipo: 'extras',
   },
   {
-    id: 'escudo_racha',
-    nombre: 'Escudo Racha',
-    puntos: 40,
-    icono: '🛡️',
-    descripcion: 'Protege tu racha durante 1 día si fallas',
-    tipo: 'proteccion',
-  },
-  {
     id: 'escudo_penalizacion',
     nombre: 'Escudo Penalización',
     puntos: 60,
@@ -102,8 +94,3 @@ export const BOOSTERS_ESPECIALES = [
   },
 ];
 
-export const RECOMPENSAS_RACHA = [
-  { racha: 7,  booster: 'boost_normal', descuento: 40, precioOriginal: 120, precioFinal: 80 },
-  { racha: 14, booster: 'mega_boost',   descuento: 50, precioOriginal: 250, precioFinal: 125 },
-  { racha: 30, booster: 'mega_boost',   descuento: 100, precioOriginal: 250, precioFinal: 0 },
-];

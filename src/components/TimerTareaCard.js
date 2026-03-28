@@ -26,6 +26,7 @@ export const TimerTareaCard = ({
   onCompletar,
 }) => {
   const config    = TAREAS_CON_TIMER[tarea.id];
+  if (!config) return null;
   const segundos  = timerSegundos[tarea.id] || 0;
   const activo    = timersActivos[tarea.id] || false;
   const completo  = segundos >= config.duracion;

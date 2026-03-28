@@ -23,15 +23,10 @@ export const calcularPuntosConBonus = (puntosBase, tipoTarea = 'base', user = nu
     puntos = Math.floor(puntos * boosterActivo.multiplicador);
   }
 
-  // Extra Master: x3 para tareas extra
+  // Extra Master: x3 para tareas extra (sobre la base, no sobre el booster)
   const extraMaster = getExtraMasterActivo(user);
   if (extraMaster && tipoTarea === 'extra') {
-    puntos = Math.floor(puntos * 3);
-  }
-
-  // Bonus racha (max +50% con racha 10+)
-  if (user?.racha > 0) {
-    puntos += Math.floor(puntosBase * 0.05 * Math.min(user.racha, 10));
+    puntos += Math.floor(puntosBase * 2); // +2x base = total 3x base (sumado, no multiplicado)
   }
 
   // Bonus fin de semana +20%

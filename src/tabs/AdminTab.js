@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, TextInput, Modal, StyleSheet, Platform } from 'react-native';
 import { COLORS } from '../constants/colors';
-import { SECCIONES_TAREAS, TAREAS_PERSONALES, TAREAS_EXTRAS, PROYECTOS_CASA } from '../constants/tareas';
+import { SECCIONES_TAREAS, TAREAS_PERSONALES, TAREAS_EXTRAS } from '../constants/tareas';
 import { getNivel } from '../constants/niveles';
-import { PUNTOS_POR_HORA } from '../constants/tareas';
+import { GRUPOS, getGrupoPorId, getDiaEnBloque, diasRestantesBloque } from '../constants/rotacion';
 import { confirmar } from '../utils/confirmar';
 
 export const AdminTab = ({
@@ -16,22 +16,23 @@ export const AdminTab = ({
   onResetearPuntosUsuario,
   onResetearTodos,
   onBorrarHistorial,
-  getHorasHoy,
-  getHorasSemana,
   tareasCustom = [],
   onAgregarTareaCustom,
   onBorrarTareaCustom,
   tareasOcultas = [],
   onOcultarTarea,
   onRestaurarTarea,
+  configRotacion = null,
+  onRotarGrupos,
 }) => {
   const [modalUsuario, setModalUsuario] = useState(null);
   const [inputPuntos, setInputPuntos]   = useState('');
   const [modalTarea, setModalTarea]     = useState(false);
   const [nuevaTareaNombre, setNuevaTareaNombre] = useState('');
-  const [nuevaTareaPuntos, setNuevaTareaPuntos] = useState('');
+  const [nuevaTareaEsfuerzo, setNuevaTareaEsfuerzo] = useState(null);
   const [nuevaTareaMaxVeces, setNuevaTareaMaxVeces] = useState('1');
   const [nuevaTareaFrecuencia, setNuevaTareaFrecuencia] = useState('diaria');
+  const [nuevaTareaCategoria, setNuevaTareaCategoria] = useState('cocina');
   const [busquedaTarea, setBusquedaTarea] = useState('');
 
   const pendientes = historial.filter(h => h.estado === 'pendiente_verificacion');
@@ -71,6 +72,39 @@ export const AdminTab = ({
         )}
       </View>
 
+      {/* Rotación de grupos */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>🔄 Rotación de grupos</Text>
+        <Text style={styles.rotacionInfo}>
+          Día {getDiaEnBloque(configRotacion?.inicioCiclo)}/5 · Quedan {diasRestantesBloque(configRotacion?.inicioCiclo)} días
+        </Text>
+        {usuariosActivos.map(u => {
+          const grupo = u.grupoActual ? getGrupoPorId(u.grupoActual) : null;
+          return (
+            <View key={u.id} style={styles.rotacionCard}>
+              <Text style={styles.rotacionNombre}>{u.nombre}</Text>
+              {grupo ? (
+                <Text style={styles.rotacionGrupo}>
+                  {grupo.icono} {grupo.nombre}
+                </Text>
+              ) : (
+                <Text style={styles.rotacionSinAsignar}>Sin asignar</Text>
+              )}
+            </View>
+          );
+        })}
+        <TouchableOpacity
+          style={[styles.actionBtn, { marginTop: 12 }]}
+          onPress={() => confirmar(
+            'Rotar grupos',
+            'Se reasignarán los grupos aleatoriamente. ¿Continuar?',
+            onRotarGrupos
+          )}
+        >
+          <Text style={styles.actionBtnText}>🔀 Rotar grupos ahora</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Mantenimiento */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>🔧 Mantenimiento</Text>
@@ -101,7 +135,7 @@ export const AdminTab = ({
           style={[styles.actionBtn, styles.actionBtnDanger]}
           onPress={() => confirmar(
             'RESET TOTAL',
-            'Se pondrán TODOS los puntos, rachas, horas y boosters a 0 para todos los usuarios.',
+            'Se pondrán TODOS los puntos y boosters a 0 para todos los usuarios.',
             onResetearTodos
           )}
         >
@@ -122,25 +156,18 @@ export const AdminTab = ({
 
       {/* Resumen usuarios + horas */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>📊 Usuarios y horas</Text>
-        <Text style={styles.conversionHint}>{PUNTOS_POR_HORA} puntos = 1 hora de pantalla</Text>
+        <Text style={styles.cardTitle}>📊 Usuarios</Text>
         {usuariosActivos.map(u => {
           const nivel = getNivel(u.puntos || 0);
-          const horasHoy = getHorasHoy(u.id);
-          const horasSemana = getHorasSemana(u.id);
           return (
             <View key={u.id} style={styles.usuarioCard}>
               <View style={styles.usuarioTop}>
                 <Text style={styles.usuarioIcon}>{nivel.icono}</Text>
                 <View style={styles.usuarioInfo}>
                   <Text style={styles.usuarioNombre}>{u.nombre}</Text>
-                  <Text style={styles.usuarioNivel}>Nv{nivel.nivel} · 🔥 {u.racha || 0} días</Text>
+                  <Text style={styles.usuarioNivel}>Nv{nivel.nivel}</Text>
                 </View>
                 <Text style={styles.usuarioPts}>{u.puntos || 0} pts</Text>
-              </View>
-              <View style={styles.horasRow}>
-                <Text style={styles.horasTexto}>📱 Hoy: {horasHoy}h</Text>
-                <Text style={styles.horasTexto}>📅 Semana: {horasSemana}h</Text>
               </View>
               <View style={styles.usuarioActions}>
                 <TouchableOpacity
@@ -153,7 +180,7 @@ export const AdminTab = ({
                   style={styles.btnReset}
                   onPress={() => confirmar(
                     'Resetear',
-                    `¿Poner puntos, racha y horas de ${u.nombre} a 0?`,
+                    `¿Poner puntos de ${u.nombre} a 0?`,
                     () => onResetearPuntosUsuario(u.id)
                   )}
                 >
@@ -229,7 +256,6 @@ export const AdminTab = ({
           ...SECCIONES_TAREAS,
           { key: 'personal', titulo: '🧑 Personales', tareas: TAREAS_PERSONALES },
           { key: 'extras', titulo: '⚡ Extras', tareas: TAREAS_EXTRAS },
-          { key: 'proyectos', titulo: '🔨 Proyectos', tareas: PROYECTOS_CASA },
         ].map(sec => {
           const tareasFiltradas = sec.tareas.filter(t =>
             !busquedaTarea || t.nombre.toLowerCase().includes(busquedaTarea.toLowerCase())
@@ -310,23 +336,59 @@ export const AdminTab = ({
               value={nuevaTareaNombre}
               onChangeText={setNuevaTareaNombre}
             />
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Puntos (ej: 5)"
-              placeholderTextColor={COLORS.textMuted}
-              keyboardType="numeric"
-              value={nuevaTareaPuntos}
-              onChangeText={setNuevaTareaPuntos}
-            />
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Máx veces por día (ej: 1)"
-              placeholderTextColor={COLORS.textMuted}
-              keyboardType="numeric"
-              value={nuevaTareaMaxVeces}
-              onChangeText={setNuevaTareaMaxVeces}
-            />
 
+            {/* Sección / Categoría */}
+            <Text style={styles.modalLabel}>Sección</Text>
+            <View style={styles.categoriaGrid}>
+              {[
+                { key: 'cocina', label: '🍳 Cocina' },
+                { key: 'lavabos', label: '🚿 Lavabos' },
+                { key: 'robot', label: '🤖 Robot' },
+                { key: 'lavanderia', label: '👕 Lavandería' },
+                { key: 'tapers', label: '🍱 Tapers' },
+                { key: 'casa', label: '🏠 Casa' },
+                { key: 'personal', label: '🧑 Personal' },
+                { key: 'extra', label: '⭐ Extra' },
+              ].map(c => (
+                <TouchableOpacity
+                  key={c.key}
+                  style={[styles.categoriaBtn, nuevaTareaCategoria === c.key && styles.categoriaBtnActive]}
+                  onPress={() => setNuevaTareaCategoria(c.key)}
+                >
+                  <Text style={[styles.categoriaBtnText, nuevaTareaCategoria === c.key && styles.categoriaBtnTextActive]}>
+                    {c.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Esfuerzo = puntos automáticos */}
+            <Text style={styles.modalLabel}>Esfuerzo</Text>
+            <View style={styles.esfuerzoRow}>
+              {[
+                { pts: 1, label: 'Micro', sub: '30 seg' },
+                { pts: 2, label: 'Rápida', sub: '1-3 min' },
+                { pts: 3, label: 'Media', sub: '5 min' },
+                { pts: 5, label: 'Larga', sub: '10-15 min' },
+                { pts: 8, label: 'Pesada', sub: '20+ min' },
+              ].map(e => (
+                <TouchableOpacity
+                  key={e.pts}
+                  style={[styles.esfuerzoBtn, nuevaTareaEsfuerzo === e.pts && styles.esfuerzoBtnActive]}
+                  onPress={() => setNuevaTareaEsfuerzo(e.pts)}
+                >
+                  <Text style={[styles.esfuerzoPts, nuevaTareaEsfuerzo === e.pts && styles.esfuerzoPtsActive]}>
+                    {e.pts}
+                  </Text>
+                  <Text style={[styles.esfuerzoLabel, nuevaTareaEsfuerzo === e.pts && styles.esfuerzoLabelActive]}>
+                    {e.label}
+                  </Text>
+                  <Text style={styles.esfuerzoSub}>{e.sub}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Frecuencia */}
             <View style={styles.frecuenciaRow}>
               {['diaria', 'ocasional'].map(f => (
                 <TouchableOpacity
@@ -341,23 +403,34 @@ export const AdminTab = ({
               ))}
             </View>
 
+            {/* Max veces */}
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Máx veces por día (ej: 1)"
+              placeholderTextColor={COLORS.textMuted}
+              keyboardType="numeric"
+              value={nuevaTareaMaxVeces}
+              onChangeText={setNuevaTareaMaxVeces}
+            />
+
             <View style={styles.modalBtns}>
               <TouchableOpacity
                 style={styles.modalBtnOk}
                 onPress={() => {
-                  const pts = parseInt(nuevaTareaPuntos, 10);
                   const max = parseInt(nuevaTareaMaxVeces, 10) || 1;
-                  if (!nuevaTareaNombre.trim() || isNaN(pts) || pts <= 0) return;
+                  if (!nuevaTareaNombre.trim() || !nuevaTareaEsfuerzo) return;
                   onAgregarTareaCustom({
                     nombre: nuevaTareaNombre,
-                    puntos: pts,
+                    puntos: nuevaTareaEsfuerzo,
                     maxVeces: max,
                     frecuencia: nuevaTareaFrecuencia,
+                    categoria: nuevaTareaCategoria,
                   });
                   setNuevaTareaNombre('');
-                  setNuevaTareaPuntos('');
+                  setNuevaTareaEsfuerzo(null);
                   setNuevaTareaMaxVeces('1');
                   setNuevaTareaFrecuencia('diaria');
+                  setNuevaTareaCategoria('cocina');
                   setModalTarea(false);
                 }}
               >
@@ -462,4 +535,36 @@ const styles = StyleSheet.create({
   frecuenciaBtnActive: { backgroundColor: COLORS.blue, borderColor: COLORS.blue },
   frecuenciaBtnText: { color: COLORS.textSecondary, fontSize: 13 },
   frecuenciaBtnTextActive: { color: '#fff', fontWeight: '700' },
+
+  // Modal nueva tarea
+  modalLabel: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '600', marginBottom: 6 },
+  categoriaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
+  categoriaBtn: {
+    paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8,
+    borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.cardInner,
+  },
+  categoriaBtnActive: { backgroundColor: COLORS.blue, borderColor: COLORS.blue },
+  categoriaBtnText: { color: COLORS.textSecondary, fontSize: 12 },
+  categoriaBtnTextActive: { color: '#fff', fontWeight: '600' },
+  esfuerzoRow: { flexDirection: 'row', gap: 6, marginBottom: 12 },
+  esfuerzoBtn: {
+    flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 8,
+    borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.cardInner,
+  },
+  esfuerzoBtnActive: { backgroundColor: COLORS.green, borderColor: COLORS.green },
+  esfuerzoPts: { color: COLORS.textPrimary, fontSize: 18, fontWeight: '700' },
+  esfuerzoPtsActive: { color: '#fff' },
+  esfuerzoLabel: { color: COLORS.textSecondary, fontSize: 10, marginTop: 2 },
+  esfuerzoLabelActive: { color: '#fff' },
+  esfuerzoSub: { color: COLORS.textMuted, fontSize: 9 },
+
+  // Rotación
+  rotacionInfo: { color: COLORS.blue, fontSize: 14, fontWeight: '600', textAlign: 'center', marginBottom: 12 },
+  rotacionCard: {
+    backgroundColor: COLORS.cardInner, borderRadius: 12, padding: 12, marginBottom: 8,
+    borderWidth: 1, borderColor: COLORS.border,
+  },
+  rotacionNombre: { color: COLORS.textPrimary, fontSize: 16, fontWeight: '700' },
+  rotacionGrupo: { color: COLORS.green, fontSize: 13, marginTop: 2 },
+  rotacionSinAsignar: { color: COLORS.yellow, fontSize: 13, marginTop: 2 },
 });

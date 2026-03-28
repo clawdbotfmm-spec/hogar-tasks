@@ -9,16 +9,21 @@ import { COLORS } from '../constants/colors';
 import {
   SECCIONES_TAREAS,
   TAREAS_PERSONALES,
-  PUNTOS_POR_HORA,
-  PUNTOS_MINIMOS_DIA,
+  TAREAS_EXTRAS,
 } from '../constants/tareas';
 import { TAREAS_CON_TIMER } from '../constants/timers';
+import {
+  getInfoRotacion,
+  diasRestantesBloque,
+  getGrupoPorId,
+} from '../constants/rotacion';
 import { TareaCard } from '../components/TareaCard';
 import { TimerTareaCard } from '../components/TimerTareaCard';
+import { fechaLocalHoy } from '../utils/fecha';
 
 // ── Enriquecer tarea con estado ──────────────────────────────────────────
 const enriquecerTarea = (t, userId, historial, esPersonal) => {
-  const fechaHoy = new Date().toISOString().split('T')[0];
+  const fechaHoy = fechaLocalHoy();
 
   const completadasHoy = historial.filter(h =>
     h.usuarioId === userId && h.tareaId === t.id &&
@@ -48,6 +53,82 @@ const enriquecerTarea = (t, userId, historial, esPersonal) => {
   };
 };
 
+// ── Tarjeta de info de rotación ─────────────────────────────────────────
+const InfoRotacion = ({ user, configRotacion }) => {
+  if (!user.grupoActual) {
+    return (
+      <View style={styles.rotacionCard}>
+        <Text style={styles.rotacionIcon}>⚠️</Text>
+        <Text style={styles.rotacionMsg}>
+          Esperando asignación de grupo...
+        </Text>
+      </View>
+    );
+  }
+
+  const inicioCiclo = configRotacion?.inicioCiclo || null;
+  const info = getInfoRotacion(user.grupoActual, inicioCiclo);
+  if (!info) return null;
+
+  const esAviso = info.avisarOcasionales;
+
+  return (
+    <View style={[styles.rotacionCard, esAviso && styles.rotacionUltimoDia]}>
+      <View style={styles.rotacionTop}>
+        <Text style={styles.rotacionIcon}>{info.grupo.icono}</Text>
+        <View style={styles.rotacionInfo}>
+          <Text style={styles.rotacionGrupo}>{info.grupo.nombre}</Text>
+          <Text style={styles.rotacionDia}>{info.mensaje}</Text>
+        </View>
+        <View style={styles.rotacionCiclo}>
+          <Text style={styles.rotacionCicloNum}>{info.diasRestantes}d</Text>
+          <Text style={styles.rotacionCicloLabel}>quedan</Text>
+        </View>
+      </View>
+      {esAviso && (
+        <View style={styles.rotacionAviso}>
+          <Text style={styles.rotacionAvisoText}>
+            ⚠️ ¡Haz las tareas ocasionales antes de que acabe el ciclo!
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
+// ── Sub-barra Casa / Personal / Extras ──────────────────────────────────
+const ModoSelector = ({ modo, setModo, numPersonalesPendientes }) => (
+  <View style={styles.modoRow}>
+    <TouchableOpacity
+      style={[styles.modoBtn, modo === 'casa' && styles.modoBtnActive]}
+      onPress={() => setModo('casa')}
+    >
+      <Text style={[styles.modoText, modo === 'casa' && styles.modoTextActive]}>
+        🏠 Casa
+      </Text>
+    </TouchableOpacity>
+    <TouchableOpacity
+      style={[styles.modoBtn, modo === 'personal' && styles.modoBtnActive]}
+      onPress={() => setModo('personal')}
+    >
+      <Text style={[styles.modoText, modo === 'personal' && styles.modoTextActive]}>
+        🧑 Personal
+        {numPersonalesPendientes > 0 && (
+          <Text style={styles.badgeRed}> {numPersonalesPendientes}</Text>
+        )}
+      </Text>
+    </TouchableOpacity>
+    <TouchableOpacity
+      style={[styles.modoBtn, modo === 'extras' && styles.modoBtnActive]}
+      onPress={() => setModo('extras')}
+    >
+      <Text style={[styles.modoText, modo === 'extras' && styles.modoTextActive]}>
+        ⭐ Extras
+      </Text>
+    </TouchableOpacity>
+  </View>
+);
+
 // ── Sub-barra Por hacer / Realizadas ─────────────────────────────────────
 const SubTabBar = ({ subTab, setSubTab, numPendientes, numHechas }) => (
   <View style={styles.subTabRow}>
@@ -72,88 +153,31 @@ const SubTabBar = ({ subTab, setSubTab, numPendientes, numHechas }) => (
   </View>
 );
 
-// ── Selector Casa / Personal ─────────────────────────────────────────────
-const ModoSelector = ({ modo, setModo }) => (
-  <View style={styles.modoRow}>
-    <TouchableOpacity
-      style={[styles.modoBtn, modo === 'casa' && styles.modoBtnActive]}
-      onPress={() => setModo('casa')}
-    >
-      <Text style={[styles.modoText, modo === 'casa' && styles.modoTextActive]}>
-        🏠 Casa
-      </Text>
-    </TouchableOpacity>
-    <TouchableOpacity
-      style={[styles.modoBtn, modo === 'personal' && styles.modoBtnActive]}
-      onPress={() => setModo('personal')}
-    >
-      <Text style={[styles.modoText, modo === 'personal' && styles.modoTextActive]}>
-        🧑 Personal
-      </Text>
-    </TouchableOpacity>
-  </View>
-);
-
-// ── Progreso del día (puntos vs mínimo) ──────────────────────────────────
-const ProgresoDia = ({ puntosHoy, horasHoy, horasSemana }) => {
-  const porcentaje = Math.min((puntosHoy / PUNTOS_MINIMOS_DIA) * 100, 100);
-  const llegaMinimo = puntosHoy >= PUNTOS_MINIMOS_DIA;
-  const barColor = llegaMinimo ? COLORS.green : porcentaje > 60 ? COLORS.yellow : COLORS.red;
-
-  return (
-    <View style={[styles.progresoCard, llegaMinimo && styles.progresoCardOk]}>
-      <View style={styles.progresoTop}>
-        <View style={styles.progresoHoras}>
-          <Text style={styles.progresoHorasNum}>{horasHoy}h</Text>
-          <Text style={styles.progresoLabel}>Hoy</Text>
-        </View>
-        <View style={styles.progresoCentro}>
-          {llegaMinimo ? (
-            <>
-              <Text style={styles.progresoOkIcon}>✅</Text>
-              <Text style={styles.progresoOkTexto}>¡Mínimo alcanzado!</Text>
-            </>
-          ) : (
-            <>
-              <Text style={styles.progresoPtsActual}>{puntosHoy}/{PUNTOS_MINIMOS_DIA}</Text>
-              <Text style={styles.progresoLabel}>pts mínimo</Text>
-            </>
-          )}
-        </View>
-        <View style={styles.progresoHoras}>
-          <Text style={styles.progresoSemanaNum}>{horasSemana}h</Text>
-          <Text style={styles.progresoLabel}>Semana</Text>
-        </View>
-      </View>
-      {!llegaMinimo && (
-        <View style={styles.barraMinimoContainer}>
-          <View style={styles.barraMinimo}>
-            <View style={[styles.barraFill, { width: `${porcentaje}%`, backgroundColor: barColor }]} />
-          </View>
-          <Text style={[styles.barraTexto, { color: barColor }]}>
-            Faltan {PUNTOS_MINIMOS_DIA - puntosHoy} pts
-          </Text>
-        </View>
-      )}
-    </View>
-  );
-};
-
 // ── Sección de verificar tareas de OTROS ─────────────────────────────────
-const VerificarOtros = ({ pendientes, onVerificar }) => {
+const VerificarOtros = ({ pendientes, onVerificar, isAdmin }) => {
   if (pendientes.length === 0) return null;
+
+  // Filtrar: hermanos solo ven tareas de casa, admin solo ve personales
+  const filtradas = pendientes.filter(t => {
+    if (isAdmin) return t.tipo === 'personal';
+    return t.tipo !== 'personal';
+  });
+
+  if (filtradas.length === 0) return null;
 
   return (
     <View style={styles.verificarCard}>
       <Text style={styles.verificarTitle}>
-        👀 Verificar tareas de compañeros ({pendientes.length})
+        👀 Verificar tareas ({filtradas.length})
       </Text>
-      {pendientes.map(t => (
+      {filtradas.map(t => (
         <View key={t.id} style={styles.verificarItem}>
           <View style={styles.verificarInfo}>
             <Text style={styles.verificarUsuario}>{t.usuarioNombre}</Text>
             <Text style={styles.verificarTarea}>{t.tareaNombre}</Text>
-            <Text style={styles.verificarPts}>+{t.puntos} pts</Text>
+            <Text style={styles.verificarPts}>
+              {t.tipo === 'personal' ? 'Personal' : `+${t.puntos} pts`}
+            </Text>
           </View>
           <View style={styles.verificarBtns}>
             <TouchableOpacity
@@ -175,6 +199,17 @@ const VerificarOtros = ({ pendientes, onVerificar }) => {
   );
 };
 
+// ── Puntos del ciclo ─────────────────────────────────────────────────────
+const PuntosCiclo = ({ user }) => (
+  <View style={styles.puntosCard}>
+    <Text style={styles.puntosTitle}>💰 Tus puntos</Text>
+    <Text style={styles.puntosNum}>{user.puntos || 0} pts</Text>
+    <Text style={styles.puntosHint}>
+      Canjéalos en la tienda
+    </Text>
+  </View>
+);
+
 // ── Componente principal ─────────────────────────────────────────────────
 export const TareasTab = ({
   user,
@@ -183,9 +218,6 @@ export const TareasTab = ({
   onDeshacer,
   onVerificar,
   pendientesVerificar,
-  puntosHoy,
-  horasHoy,
-  horasSemana,
   timerSegundos,
   timersActivos,
   formatearTiempo,
@@ -193,15 +225,31 @@ export const TareasTab = ({
   onResetTimer,
   tareasCustom = [],
   tareasOcultas = [],
+  configRotacion = null,
 }) => {
   const [subTab, setSubTab] = useState('pendientes');
   const [modo, setModo]     = useState('casa');
+
+  // Personales enriquecidas (para el badge)
+  const personales = TAREAS_PERSONALES
+    .filter(t => !tareasOcultas.includes(t.id))
+    .map(t => enriquecerTarea(t, user.id, historial, true));
+  const numPersonalesPendientes = personales.filter(t => !t.completada).length;
 
   let todasTareas = [];
   let secciones = [];
 
   if (modo === 'casa') {
-    SECCIONES_TAREAS.forEach(sec => {
+    // Solo mostrar secciones del grupo asignado
+    const grupo = user.grupoActual ? getGrupoPorId(user.grupoActual) : null;
+    const seccionesPermitidas = grupo ? grupo.seccionesKey : [];
+
+    // Casa diaria y ocasional son comunes a todos
+    const seccionesCasa = SECCIONES_TAREAS.filter(sec =>
+      sec.key === 'casa_diaria' || sec.key === 'casa_ocasional' || seccionesPermitidas.includes(sec.key)
+    );
+
+    seccionesCasa.forEach(sec => {
       const tareasEnriquecidas = sec.tareas
         .filter(t => !tareasOcultas.includes(t.id))
         .map(t => enriquecerTarea(t, user.id, historial, false));
@@ -210,20 +258,24 @@ export const TareasTab = ({
         todasTareas.push(...tareasEnriquecidas);
       }
     });
-    // Tareas personalizadas del admin
+
+    // Tareas custom del admin
     if (tareasCustom.length > 0) {
       const customEnriquecidas = tareasCustom.map(t =>
         enriquecerTarea(t, user.id, historial, false)
       );
-      secciones.push({ key: 'custom', titulo: '⭐ Extras', tareas: customEnriquecidas });
+      secciones.push({ key: 'custom', titulo: '⭐ Personalizadas', tareas: customEnriquecidas });
       todasTareas.push(...customEnriquecidas);
     }
-  } else {
-    const personales = TAREAS_PERSONALES
-      .filter(t => !tareasOcultas.includes(t.id))
-      .map(t => enriquecerTarea(t, user.id, historial, true));
+  } else if (modo === 'personal') {
     secciones = [{ key: 'personal', titulo: '🧑 Mis tareas personales', tareas: personales }];
     todasTareas = personales;
+  } else if (modo === 'extras') {
+    const extras = TAREAS_EXTRAS
+      .filter(t => !tareasOcultas.includes(t.id))
+      .map(t => enriquecerTarea(t, user.id, historial, false));
+    secciones = [{ key: 'extras', titulo: '⭐ Tareas extras', tareas: extras }];
+    todasTareas = extras;
   }
 
   const pendientes = todasTareas.filter(t => !t.completada);
@@ -250,23 +302,28 @@ export const TareasTab = ({
         tarea={t}
         onCompletar={() => onCompletar(t)}
         onDeshacer={() => onDeshacer(t.ultimaHistorialId)}
+        esPersonal={modo === 'personal'}
       />
     );
   };
 
   return (
     <View style={styles.tabContent}>
-      {/* Progreso del día */}
-      <ProgresoDia puntosHoy={puntosHoy} horasHoy={horasHoy} horasSemana={horasSemana} />
+      {/* Info de rotación */}
+      <InfoRotacion user={user} configRotacion={configRotacion} />
+
+      {/* Puntos del ciclo */}
+      <PuntosCiclo user={user} />
 
       {/* Verificar tareas de otros */}
       <VerificarOtros
         pendientes={pendientesVerificar}
         onVerificar={onVerificar}
+        isAdmin={user.isAdmin}
       />
 
-      {/* Selector Casa / Personal */}
-      <ModoSelector modo={modo} setModo={setModo} />
+      {/* Selector Casa / Personal / Extras */}
+      <ModoSelector modo={modo} setModo={setModo} numPersonalesPendientes={numPersonalesPendientes} />
 
       {/* Sub-barra */}
       <SubTabBar
@@ -275,6 +332,16 @@ export const TareasTab = ({
         numPendientes={pendientes.length}
         numHechas={hechas.length}
       />
+
+      {/* Aviso personales */}
+      {modo === 'personal' && (
+        <View style={styles.personalAviso}>
+          <Text style={styles.personalAvisoText}>
+            Las tareas personales no dan puntos. Son obligatorias.
+            {'\n'}Si marcas una como hecha sin hacerla: -puntos doble.
+          </Text>
+        </View>
+      )}
 
       {/* Por hacer */}
       {subTab === 'pendientes' && (
@@ -320,7 +387,9 @@ export const TareasTab = ({
                     <Text style={styles.tareaHechaQuien}>Hecha por: {t.quienLaHizo}</Text>
                   )}
                 </View>
-                <Text style={styles.tareaHechaPts}>+{t.puntos} pts</Text>
+                <Text style={styles.tareaHechaPts}>
+                  {modo === 'personal' ? '✓' : `+${t.puntos} pts`}
+                </Text>
               </View>
             ))
           )}
@@ -333,29 +402,46 @@ export const TareasTab = ({
 const styles = StyleSheet.create({
   tabContent: { padding: 16, gap: 12 },
 
-  // Progreso del día
-  progresoCard: {
+  // Rotación
+  rotacionCard: {
     backgroundColor: COLORS.card,
     borderRadius: 16,
     padding: 16,
     borderWidth: 2,
-    borderColor: COLORS.yellow,
+    borderColor: COLORS.blue,
   },
-  progresoCardOk: { borderColor: COLORS.green },
-  progresoTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  progresoHoras: { flex: 1, alignItems: 'center' },
-  progresoHorasNum: { color: COLORS.green, fontSize: 24, fontWeight: '700' },
-  progresoSemanaNum: { color: COLORS.blue, fontSize: 24, fontWeight: '700' },
-  progresoCentro: { flex: 2, alignItems: 'center' },
-  progresoPtsActual: { color: COLORS.yellow, fontSize: 28, fontWeight: '900' },
-  progresoLabel: { color: COLORS.textSecondary, fontSize: 11, marginTop: 2 },
-  progresoOkIcon: { fontSize: 28 },
-  progresoOkTexto: { color: COLORS.green, fontSize: 14, fontWeight: '700', marginTop: 4 },
+  rotacionUltimoDia: { borderColor: COLORS.red },
+  rotacionTop: { flexDirection: 'row', alignItems: 'center' },
+  rotacionIcon: { fontSize: 36, marginRight: 12 },
+  rotacionInfo: { flex: 1 },
+  rotacionGrupo: { color: COLORS.textPrimary, fontSize: 18, fontWeight: '700' },
+  rotacionDia: { color: COLORS.textSecondary, fontSize: 13, marginTop: 2 },
+  rotacionMsg: { color: COLORS.yellow, fontSize: 14, textAlign: 'center' },
+  rotacionCiclo: { alignItems: 'center' },
+  rotacionCicloNum: { color: COLORS.blue, fontSize: 20, fontWeight: '700' },
+  rotacionCicloLabel: { color: COLORS.textSecondary, fontSize: 10 },
+  rotacionAviso: {
+    backgroundColor: `${COLORS.red}20`,
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: COLORS.red,
+  },
+  rotacionAvisoText: { color: COLORS.red, fontSize: 13, fontWeight: '600', textAlign: 'center' },
 
-  barraMinimoContainer: { marginTop: 4 },
-  barraMinimo: { height: 10, backgroundColor: COLORS.cardInner, borderRadius: 5, overflow: 'hidden' },
-  barraFill: { height: '100%', borderRadius: 5 },
-  barraTexto: { fontSize: 12, fontWeight: '600', textAlign: 'center', marginTop: 4 },
+  // Puntos ciclo
+  puntosCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    padding: 14,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.green,
+  },
+  puntosTitle: { color: COLORS.textSecondary, fontSize: 13 },
+  puntosNum: { color: COLORS.green, fontSize: 32, fontWeight: '900', marginVertical: 2 },
+  puntosHint: { color: COLORS.textMuted, fontSize: 11, textAlign: 'center' },
 
   // Verificar otros
   verificarCard: {
@@ -390,8 +476,9 @@ const styles = StyleSheet.create({
   modoRow: { flexDirection: 'row', backgroundColor: COLORS.bgDark, borderRadius: 12, padding: 4 },
   modoBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
   modoBtnActive: { backgroundColor: COLORS.card },
-  modoText: { color: COLORS.textSecondary, fontSize: 14, fontWeight: '600' },
+  modoText: { color: COLORS.textSecondary, fontSize: 13, fontWeight: '600' },
   modoTextActive: { color: COLORS.blue },
+  badgeRed: { color: COLORS.red, fontWeight: '700' },
 
   // Sub-barra
   subTabRow: { flexDirection: 'row', backgroundColor: COLORS.bgDark, borderRadius: 12, padding: 4 },
@@ -401,6 +488,21 @@ const styles = StyleSheet.create({
   subTabTextActive: { color: COLORS.blue },
   badge: { color: COLORS.blue, fontWeight: '700' },
   badgeDone: { color: COLORS.green, fontWeight: '700' },
+
+  // Aviso personal
+  personalAviso: {
+    backgroundColor: `${COLORS.yellow}15`,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: COLORS.yellow,
+  },
+  personalAvisoText: {
+    color: COLORS.yellow,
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
 
   // Cards
   card: { backgroundColor: COLORS.card, borderRadius: 16, padding: 16 },

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StatusBar,
@@ -7,17 +7,20 @@ import {
   Platform,
   StyleSheet,
 } from 'react-native';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 
 import { COLORS } from './src/constants/colors';
-import { PUNTOS_MINIMOS_DIA, HORA_AVISO } from './src/constants/tareas';
+import { HORA_AVISO } from './src/constants/tareas';
+import { necesitaRotar } from './src/constants/rotacion';
+import { auth, crearUsuarioFirestore } from './src/hooks/useFirestore';
 import { useFirestore } from './src/hooks/useFirestore';
 import { useTimers } from './src/hooks/useTimers';
 import { calcularPuntosConBonus } from './src/hooks/useBoosters';
 import { confirmar, alerta } from './src/utils/confirmar';
+import { useMemos } from './src/hooks/useMemos';
 
 import { LoginScreen } from './src/screens/LoginScreen';
 import { Header } from './src/components/Header';
-import { ProgressBar } from './src/components/ProgressBar';
 import { TabBar } from './src/components/TabBar';
 import { AvisoMinimo } from './src/components/AvisoMinimo';
 
@@ -26,44 +29,64 @@ import { ListaCompraTab } from './src/tabs/ListaCompraTab';
 import { RankingTab } from './src/tabs/RankingTab';
 import { TiendaTab } from './src/tabs/TiendaTab';
 import { AdminTab } from './src/tabs/AdminTab';
+import { LogrosTab } from './src/tabs/LogrosTab';
 
 export default function App() {
-  const [user, setUser]                 = useState(null);
-  const [tab, setTab]                   = useState('tareas');
-  const [mostrarAviso, setMostrarAviso] = useState(false);
-  const [avisoCerrado, setAvisoCerrado] = useState(false);
-  const penalizacionChecked             = useRef(false);
-
+  const [authUser, setAuthUser]           = useState(undefined); // undefined = cargando, null = no auth
+  const [tab, setTab]                     = useState('tareas');
+  const [mostrarAviso, setMostrarAviso]   = useState(false);
+  const [avisoCerrado, setAvisoCerrado]   = useState(false);
   const firestore = useFirestore();
-  const { usuarios, historial, listaCompra, tareasCustom, tareasOcultas, loading } = firestore;
+  const { usuarios, historial, tareasCustom, tareasOcultas, configRotacion, loading } = firestore;
+  const memos = useMemos();
 
   const { timerSegundos, timersActivos, formatearTiempo, toggleTimer, resetearTimer } =
     useTimers();
 
-  // Comprobar penalización de ayer al cargar
+  // Escuchar estado de autenticación
   useEffect(() => {
-    if (!loading && usuarios.length > 0 && !penalizacionChecked.current) {
-      penalizacionChecked.current = true;
-      firestore.comprobarPenalizacionAyer();
-    }
-  }, [loading, usuarios.length]);
+    const unsub = onAuthStateChanged(auth, (fbUser) => {
+      setAuthUser(fbUser || null);
+    });
+    return unsub;
+  }, []);
 
-  // Timer para el aviso de las 20:00
+  // Usuario actual de Firestore (vinculado por UID de Firebase Auth)
+  const user = authUser && usuarios.find(u => u.id === authUser.uid) || null;
+
+
+  // Limpiar boosters expirados al cargar
+  useEffect(() => {
+    if (user && !user.isAdmin) {
+      firestore.limpiarBoostersExpirados(user);
+    }
+  }, [user?.id]);
+
+  // Auto-rotar grupos si el ciclo de 5 días ha terminado (solo admin)
+  const [rotacionPendiente, setRotacionPendiente] = useState(true);
+  useEffect(() => {
+    if (!loading && usuarios.length > 0 && rotacionPendiente && user?.isAdmin) {
+      const inicio = configRotacion?.inicioCiclo || null;
+      if (necesitaRotar(inicio)) {
+        firestore.rotarGrupos();
+      }
+      setRotacionPendiente(false);
+    }
+  }, [loading, usuarios.length, configRotacion?.inicioCiclo, user?.isAdmin]);
+
+  // Timer para el aviso de las 20:00 — personales pendientes
   useEffect(() => {
     if (!user || user.isAdmin) return;
     const checkAviso = () => {
       const hora = new Date().getHours();
       if (hora >= HORA_AVISO && !avisoCerrado) {
-        const ptsHoy = firestore.getPuntosHoy(user.id);
-        if (ptsHoy < PUNTOS_MINIMOS_DIA) {
-          setMostrarAviso(true);
-        }
+        setMostrarAviso(true);
       }
     };
     checkAviso();
     const interval = setInterval(checkAviso, 60000);
     return () => clearInterval(interval);
-  }, [user, avisoCerrado, historial]);
+  }, [user, avisoCerrado]);
 
   // Reset aviso al cambiar de día
   useEffect(() => {
@@ -78,6 +101,17 @@ export default function App() {
   }, []);
 
   // ── Handlers ───────────────────────────────────────────
+
+  const handleLogin = (fbUser) => {
+    setAuthUser(fbUser);
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    setAuthUser(null);
+    setTab('tareas');
+    setAvisoCerrado(false);
+  };
 
   const handleCompletar = async (tarea) => {
     if (!user) return;
@@ -137,26 +171,30 @@ export default function App() {
 
   // ── Render ─────────────────────────────────────────────
 
-  if (loading) return null;
+  // Cargando auth
+  if (authUser === undefined) return null;
 
-  if (!user) {
-    return (
-      <LoginScreen
-        usuarios={usuarios}
-        onSelect={(u) => {
-          setUser(u);
-          setTab(u.isAdmin ? 'admin' : 'tareas');
-          setAvisoCerrado(false);
-        }}
-      />
-    );
+  // No autenticado → pantalla de login/registro
+  if (!authUser) {
+    return <LoginScreen onLogin={handleLogin} />;
   }
 
-  const userActual      = usuarios.find(u => u.id === user.id) || user;
-  const horasHoy        = firestore.getHorasHoy(userActual.id);
-  const horasSemana     = firestore.getHorasSemana(userActual.id);
-  const puntosHoy       = firestore.getPuntosHoy(userActual.id);
+  // Autenticado pero Firestore aún carga
+  if (loading) return null;
+
+  // Autenticado pero aún no tiene documento en Firestore (recién registrado, esperando sync)
+  if (!user) {
+    crearUsuarioFirestore(authUser.uid, authUser.email, authUser.email.split('@')[0]);
+    return null;
+  }
+
+  const userActual      = user;
   const pendientesVerif = firestore.getPendientesDeOtros(userActual.id);
+
+  // Ajustar tab inicial según rol
+  if (userActual.isAdmin && tab === 'tareas') {
+    setTab('admin');
+  }
 
   return (
     <View style={styles.safe}>
@@ -165,9 +203,7 @@ export default function App() {
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Header user={userActual} horasHoy={horasHoy} onLogout={() => setUser(null)} />
-        <ProgressBar puntos={userActual.puntos || 0} />
-        <TabBar tab={tab} setTab={setTab} isAdmin={userActual.isAdmin} />
+        <Header user={userActual} onLogout={handleLogout} />
 
         <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
           {tab === 'tareas' && !userActual.isAdmin && (
@@ -176,13 +212,11 @@ export default function App() {
               historial={historial}
               tareasCustom={tareasCustom}
               tareasOcultas={tareasOcultas}
+              configRotacion={configRotacion}
               onCompletar={handleCompletar}
               onDeshacer={handleDeshacer}
               onVerificar={handleVerificar}
               pendientesVerificar={pendientesVerif}
-              puntosHoy={puntosHoy}
-              horasHoy={horasHoy}
-              horasSemana={horasSemana}
               timerSegundos={timerSegundos}
               timersActivos={timersActivos}
               formatearTiempo={formatearTiempo}
@@ -191,19 +225,23 @@ export default function App() {
             />
           )}
 
+          {tab === 'logros' && !userActual.isAdmin && (
+            <LogrosTab user={userActual} historial={historial} />
+          )}
+
           {tab === 'lista' && (
             <ListaCompraTab
               user={userActual}
-              listaCompra={listaCompra}
-              onAgregar={firestore.agregarProducto}
-              onMarcarComprado={firestore.marcarComprado}
-              onEliminar={firestore.eliminarProducto}
-              onLimpiarComprados={firestore.limpiarComprados}
+              listaCompra={memos.listaCompra}
+              onAgregar={memos.agregarProducto}
+              onMarcarComprado={memos.marcarComprado}
+              onEliminar={memos.eliminarProducto}
+              onLimpiarComprados={memos.limpiarComprados}
             />
           )}
 
           {tab === 'ranking' && (
-            <RankingTab user={userActual} usuarios={usuarios} historial={historial} />
+            <RankingTab user={userActual} usuarios={usuarios} historial={historial} configRotacion={configRotacion} />
           )}
 
           {tab === 'tienda' && !userActual.isAdmin && (
@@ -226,22 +264,23 @@ export default function App() {
               onResetearPuntosUsuario={firestore.resetearPuntosUsuario}
               onResetearTodos={firestore.resetearTodosPuntos}
               onBorrarHistorial={firestore.borrarTodoHistorial}
-              getHorasHoy={firestore.getHorasHoy}
-              getHorasSemana={firestore.getHorasSemana}
               tareasCustom={tareasCustom}
               onAgregarTareaCustom={firestore.agregarTareaCustom}
               onBorrarTareaCustom={firestore.borrarTareaCustom}
               tareasOcultas={tareasOcultas}
               onOcultarTarea={firestore.ocultarTarea}
               onRestaurarTarea={firestore.restaurarTarea}
+              configRotacion={configRotacion}
+              onRotarGrupos={firestore.rotarGrupos}
             />
           )}
         </ScrollView>
 
+        <TabBar tab={tab} setTab={setTab} isAdmin={userActual.isAdmin} />
+
         {!userActual.isAdmin && (
           <AvisoMinimo
             visible={mostrarAviso}
-            puntosHoy={puntosHoy}
             onCerrar={handleCerrarAviso}
           />
         )}

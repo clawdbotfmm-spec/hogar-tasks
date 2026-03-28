@@ -13,8 +13,11 @@ import {
   setDoc,
   getDoc,
   writeBatch,
+  runTransaction,
 } from 'firebase/firestore';
-import { PUNTOS_POR_HORA, PUNTOS_MINIMOS_DIA } from '../constants/tareas';
+import { getAuth } from 'firebase/auth';
+import { TAREAS_PERSONALES } from '../constants/tareas';
+import { fechaLocalHoy } from '../utils/fecha';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyBT76DLdmAj423rYXKS2wm2sfD1YgNKg90',
@@ -27,23 +30,30 @@ const firebaseConfig = {
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 export const db = getFirestore(app);
+export const auth = getAuth(app);
 
-// ─── Crear usuarios iniciales si no existen ──────────────────────────────
-export const crearUsuariosIniciales = async () => {
-  const base = [
-    { id: 'usuario_daniel', nombre: 'Daniel', puntos: 0, horasAcumuladas: 0, racha: 0, nivel: 1, isAdmin: false },
-    { id: 'usuario_sergio', nombre: 'Sergio', puntos: 0, horasAcumuladas: 0, racha: 0, nivel: 1, isAdmin: false },
-    { id: 'usuario_diego',  nombre: 'Diego',  puntos: 0, horasAcumuladas: 0, racha: 0, nivel: 1, isAdmin: false },
-    { id: 'usuario_adulto', nombre: 'Adulto', puntos: 0, horasAcumuladas: 0, racha: 0, nivel: 1, isAdmin: true  },
-  ];
-  for (const u of base) {
-    const ref = doc(db, 'hogar_usuarios', u.id);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) {
-      const { id, ...datos } = u;
-      await setDoc(ref, { ...datos, creado: new Date().toISOString() });
-    }
+// Emails de administradores
+const ADMIN_EMAILS = [
+  'clawdbotfmm@gmail.com',
+  'saramarrupe@gmail.com',
+];
+
+// ─── Crear documento de usuario en Firestore al registrarse ──────────────
+export const crearUsuarioFirestore = async (uid, email, nombre) => {
+  const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
+  const ref = doc(db, 'hogar_usuarios', uid);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    await setDoc(ref, {
+      nombre,
+      email: email.toLowerCase(),
+      puntos: 0,
+      nivel: 1,
+      isAdmin,
+      creado: new Date().toISOString(),
+    });
   }
+  return isAdmin;
 };
 
 // ─── Hook principal ──────────────────────────────────────────────────────
@@ -54,8 +64,11 @@ export const useFirestore = () => {
   const [loading, setLoading]         = useState(true);
   const [tareasCustom, setTareasCustom] = useState([]);
   const [tareasOcultas, setTareasOcultas] = useState([]);
+  const [configRotacion, setConfigRotacion] = useState(null);
 
   useEffect(() => {
+    const onErr = (e) => console.error('Firestore listener error:', e);
+
     // Usuarios
     const unsubUsuarios = onSnapshot(
       collection(db, 'hogar_usuarios'),
@@ -63,28 +76,38 @@ export const useFirestore = () => {
         const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         setUsuarios(data);
         setLoading(false);
-        if (data.length === 0 && !snap.metadata.fromCache) {
-          crearUsuariosIniciales();
-        }
-      }
+      },
+      onErr
     );
 
     // Historial
     const unsubHistorial = onSnapshot(
       query(collection(db, 'hogar_historial'), orderBy('fecha', 'desc')),
-      (snap) => setHistorial(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      (snap) => setHistorial(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      onErr
     );
 
     // Lista de la compra (tiempo real)
     const unsubLista = onSnapshot(
       query(collection(db, 'hogar_lista_compra'), orderBy('creado', 'asc')),
-      (snap) => setListaCompra(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      (snap) => setListaCompra(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      onErr
     );
 
     // Tareas custom del admin
     const unsubTareasCustom = onSnapshot(
       collection(db, 'hogar_tareas_custom'),
-      (snap) => setTareasCustom(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      (snap) => setTareasCustom(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      onErr
+    );
+
+    // Config de rotación (inicio ciclo actual)
+    const unsubRotacion = onSnapshot(
+      doc(db, 'hogar_config', 'rotacion'),
+      (snap) => {
+        setConfigRotacion(snap.exists() ? snap.data() : null);
+      },
+      () => setConfigRotacion(null)
     );
 
     // Tareas ocultas (IDs de tareas estáticas desactivadas)
@@ -105,21 +128,41 @@ export const useFirestore = () => {
       unsubHistorial();
       unsubLista();
       unsubTareasCustom();
+      unsubRotacion();
       unsubTareasOcultas();
     };
   }, []);
 
+  // ── Limpiar boosters expirados ──────────────────────────────────────────
+  const limpiarBoostersExpirados = async (user) => {
+    const ahora = new Date();
+    const boostersActivos = (user.boosters || []).filter(b => new Date(b.fechaFin) >= ahora);
+    const especialesActivos = (user.boostersEspeciales || []).filter(b =>
+      !b.fechaFin || new Date(b.fechaFin) >= ahora
+    );
+    const cambio = boostersActivos.length !== (user.boosters || []).length ||
+                   especialesActivos.length !== (user.boostersEspeciales || []).length;
+    if (cambio) {
+      await updateDoc(doc(db, 'hogar_usuarios', user.id), {
+        boosters: boostersActivos,
+        boostersEspeciales: especialesActivos,
+      });
+    }
+  };
+
   // ── Completar tarea ────────────────────────────────────────────────────
   const completarTarea = async (user, tarea, puntosConBonus) => {
-    const fechaHoy = new Date().toISOString().split('T')[0];
+    const fechaHoy = fechaLocalHoy();
+    const esPersonal = tarea.categoria === 'personal';
     await addDoc(collection(db, 'hogar_historial'), {
       usuarioId: user.id,
       usuarioNombre: user.nombre,
       tareaId: tarea.id,
       tareaNombre: tarea.nombre,
-      puntos: puntosConBonus,
-      tipo: tarea.tipo || tarea.categoria || 'base',
+      puntos: esPersonal ? 0 : puntosConBonus,
+      tipo: esPersonal ? 'personal' : (tarea.tipo || tarea.categoria || 'base'),
       categoria: tarea.categoria || 'casa',
+      frecuencia: tarea.frecuencia || 'diaria',
       fecha: new Date().toISOString(),
       fechaDia: fechaHoy,
       estado: 'pendiente_verificacion',
@@ -142,28 +185,33 @@ export const useFirestore = () => {
     await deleteDoc(doc(db, 'hogar_historial', historialId));
   };
 
-  // ── Verificar/rechazar tarea (admin) ───────────────────────────────────
+  // ── Verificar/rechazar tarea (transacción atómica) ──────────────────────
   const verificarTarea = async (tarea, aprobada) => {
     const usuario = usuarios.find(u => u.id === tarea.usuarioId);
     if (!usuario) return;
-    if (aprobada) {
-      const fechaHoy = new Date().toISOString().split('T')[0];
-      const tareasHoyVerificadas = historial.filter(h =>
-        h.usuarioId === usuario.id &&
-        h.fechaDia === fechaHoy &&
-        h.estado === 'verificada'
-      );
-      const nuevaRacha =
-        tareasHoyVerificadas.length === 0
-          ? (usuario.racha || 0) + 1
-          : usuario.racha;
 
-      await updateDoc(doc(db, 'hogar_usuarios', usuario.id), {
-        puntos: (usuario.puntos || 0) + tarea.puntos,
-        racha: nuevaRacha,
-      });
+    const esPersonal = tarea.tipo === 'personal';
+    const ref = doc(db, 'hogar_usuarios', usuario.id);
+
+    if (aprobada) {
+      if (!esPersonal) {
+        await runTransaction(db, async (tx) => {
+          const snap = await tx.get(ref);
+          const datos = snap.data();
+          tx.update(ref, { puntos: (datos.puntos || 0) + tarea.puntos });
+        });
+      }
       await updateDoc(doc(db, 'hogar_historial', tarea.id), { estado: 'verificada' });
     } else {
+      if (esPersonal) {
+        const tareaOriginal = TAREAS_PERSONALES.find(t => t.id === tarea.tareaId);
+        const penalizacion = (tareaOriginal?.puntos || 3) * 2;
+        await runTransaction(db, async (tx) => {
+          const snap = await tx.get(ref);
+          const datos = snap.data();
+          tx.update(ref, { puntos: Math.max(0, (datos.puntos || 0) - penalizacion) });
+        });
+      }
       await updateDoc(doc(db, 'hogar_historial', tarea.id), { estado: 'rechazada' });
     }
   };
@@ -180,8 +228,8 @@ export const useFirestore = () => {
   const resetearPuntosUsuario = async (usuarioId) => {
     await updateDoc(doc(db, 'hogar_usuarios', usuarioId), {
       puntos: 0,
-      racha: 0,
-      horasAcumuladas: 0,
+      boosters: [],
+      boostersEspeciales: [],
     });
   };
 
@@ -191,8 +239,6 @@ export const useFirestore = () => {
     usuarios.filter(u => !u.isAdmin).forEach(u => {
       batch.update(doc(db, 'hogar_usuarios', u.id), {
         puntos: 0,
-        racha: 0,
-        horasAcumuladas: 0,
         boosters: [],
         boostersEspeciales: [],
       });
@@ -216,10 +262,14 @@ export const useFirestore = () => {
     }
   };
 
-  // ── Canjear premio ─────────────────────────────────────────────────────
+  // ── Canjear premio (transacción atómica) ────────────────────────────────
   const canjearPremio = async (user, premio) => {
-    await updateDoc(doc(db, 'hogar_usuarios', user.id), {
-      puntos: user.puntos - premio.puntos,
+    const ref = doc(db, 'hogar_usuarios', user.id);
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      const datos = snap.data();
+      if ((datos.puntos || 0) < premio.puntos) throw new Error('Puntos insuficientes');
+      tx.update(ref, { puntos: datos.puntos - premio.puntos });
     });
     await addDoc(collection(db, 'hogar_historial'), {
       usuarioId: user.id,
@@ -231,7 +281,7 @@ export const useFirestore = () => {
     });
   };
 
-  // ── Comprar booster ────────────────────────────────────────────────────
+  // ── Comprar booster (transacción atómica) ─────────────────────────────
   const comprarBooster = async (user, booster, precioFinal) => {
     const fechaFin = new Date();
     fechaFin.setDate(fechaFin.getDate() + booster.duracion);
@@ -242,13 +292,19 @@ export const useFirestore = () => {
       fechaInicio: new Date().toISOString(),
       fechaFin: fechaFin.toISOString(),
     };
-    await updateDoc(doc(db, 'hogar_usuarios', user.id), {
-      puntos: user.puntos - precioFinal,
-      boosters: [...(user.boosters || []), nuevo],
+    const ref = doc(db, 'hogar_usuarios', user.id);
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      const datos = snap.data();
+      if ((datos.puntos || 0) < precioFinal) throw new Error('Puntos insuficientes');
+      tx.update(ref, {
+        puntos: datos.puntos - precioFinal,
+        boosters: [...(datos.boosters || []), nuevo],
+      });
     });
   };
 
-  // ── Comprar booster especial ───────────────────────────────────────────
+  // ── Comprar booster especial (transacción atómica) ─────────────────────
   const comprarBoosterEspecial = async (user, booster) => {
     const nuevo = {
       id: booster.id,
@@ -256,20 +312,26 @@ export const useFirestore = () => {
       tipo: booster.tipo,
       fechaCompra: new Date().toISOString(),
     };
-    if (booster.tipo === 'extras') {
+    if (booster.duracion) {
       const fechaFin = new Date();
       fechaFin.setDate(fechaFin.getDate() + booster.duracion);
       nuevo.fechaFin = fechaFin.toISOString();
     }
-    await updateDoc(doc(db, 'hogar_usuarios', user.id), {
-      puntos: user.puntos - booster.puntos,
-      boostersEspeciales: [...(user.boostersEspeciales || []), nuevo],
+    const ref = doc(db, 'hogar_usuarios', user.id);
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      const datos = snap.data();
+      if ((datos.puntos || 0) < booster.puntos) throw new Error('Puntos insuficientes');
+      tx.update(ref, {
+        puntos: datos.puntos - booster.puntos,
+        boostersEspeciales: [...(datos.boostersEspeciales || []), nuevo],
+      });
     });
   };
 
   // ── Resetear tareas de hoy ─────────────────────────────────────────────
   const resetearTareasHoy = async () => {
-    const fechaHoy = new Date().toISOString().split('T')[0];
+    const fechaHoy = fechaLocalHoy();
     const entradasHoy = historial.filter(h => h.fechaDia === fechaHoy);
     if (entradasHoy.length === 0) return;
     const batch = writeBatch(db);
@@ -322,117 +384,52 @@ export const useFirestore = () => {
     await batch.commit();
   };
 
-  // ── Calcular horas ganadas esta semana ─────────────────────────────────
-  const getHorasSemana = (usuarioId) => {
-    const hoy = new Date();
-    const inicioSemana = new Date(hoy);
-    inicioSemana.setDate(hoy.getDate() - ((hoy.getDay() + 6) % 7)); // Lunes
-    inicioSemana.setHours(0, 0, 0, 0);
-
-    const ptsSemana = historial
-      .filter(h =>
-        h.usuarioId === usuarioId &&
-        new Date(h.fecha) >= inicioSemana &&
-        h.estado === 'verificada' &&
-        h.puntos > 0
-      )
-      .reduce((sum, h) => sum + (h.puntos || 0), 0);
-
-    return (ptsSemana / PUNTOS_POR_HORA).toFixed(1);
-  };
-
-  const getHorasHoy = (usuarioId) => {
-    const fechaHoy = new Date().toISOString().split('T')[0];
-    const ptsHoy = historial
-      .filter(h =>
-        h.usuarioId === usuarioId &&
-        h.fechaDia === fechaHoy &&
-        h.estado === 'verificada' &&
-        h.puntos > 0
-      )
-      .reduce((sum, h) => sum + (h.puntos || 0), 0);
-
-    return (ptsHoy / PUNTOS_POR_HORA).toFixed(1);
-  };
-
-  // ── Puntos verificados de un día concreto ──────────────────────────────
-  const getPuntosVerificadosDia = (usuarioId, fecha) => {
-    return historial
-      .filter(h =>
-        h.usuarioId === usuarioId &&
-        h.fechaDia === fecha &&
-        h.estado === 'verificada' &&
-        h.puntos > 0
-      )
-      .reduce((sum, h) => sum + (h.puntos || 0), 0);
-  };
-
-  const getPuntosHoy = (usuarioId) => {
-    const fechaHoy = new Date().toISOString().split('T')[0];
-    return getPuntosVerificadosDia(usuarioId, fechaHoy);
-  };
-
-  // ── Comprobar y aplicar penalización de ayer ───────────────────────────
-  // Si ayer no llegaron al mínimo → pierden PUNTOS_MINIMOS_DIA puntos
-  const comprobarPenalizacionAyer = async () => {
-    const ayer = new Date();
-    ayer.setDate(ayer.getDate() - 1);
-    const fechaAyer = ayer.toISOString().split('T')[0];
-
-    // Solo penalizar días de semana y sábado (no domingo por si no hubo tareas)
-    // En realidad penalizamos todos los días — si hay tareas disponibles, hay que hacerlas
-
-    for (const u of usuarios.filter(x => !x.isAdmin)) {
-      // Comprobar si ya se aplicó penalización para ayer
-      if (u.ultimaPenalizacion === fechaAyer) continue;
-
-      const ptsAyer = getPuntosVerificadosDia(u.id, fechaAyer);
-
-      if (ptsAyer < PUNTOS_MINIMOS_DIA) {
-        // Comprobar escudo anti-penalización
-        const escudo = (u.boostersEspeciales || []).find(
-          b => b.tipo === 'anti_penalizacion' && !b.usado
-        );
-
-        if (escudo) {
-          // Usar el escudo en vez de penalizar
-          const nuevosEspeciales = (u.boostersEspeciales || []).map(b =>
-            b === escudo ? { ...b, usado: true } : b
-          );
-          await updateDoc(doc(db, 'hogar_usuarios', u.id), {
-            boostersEspeciales: nuevosEspeciales,
-            ultimaPenalizacion: fechaAyer,
-          });
-        } else {
-          // Penalización: restar puntos de un día completo
-          const nuevos = Math.max(0, (u.puntos || 0) - PUNTOS_MINIMOS_DIA);
-          await updateDoc(doc(db, 'hogar_usuarios', u.id), {
-            puntos: nuevos,
-            racha: 0, // Se pierde la racha también
-            ultimaPenalizacion: fechaAyer,
-          });
-
-          // Registrar en historial
-          await addDoc(collection(db, 'hogar_historial'), {
-            usuarioId: u.id,
-            usuarioNombre: u.nombre,
-            tipo: 'penalizacion',
-            tareaNombre: `Penalización: no llegaste a ${PUNTOS_MINIMOS_DIA} pts ayer (hiciste ${ptsAyer})`,
-            puntos: -PUNTOS_MINIMOS_DIA,
-            fecha: new Date().toISOString(),
-            fechaDia: new Date().toISOString().split('T')[0],
-            estado: 'verificada',
-          });
-        }
-      }
-    }
-  };
-
   // ── Obtener pendientes de verificar (de OTROS usuarios) ────────────────
   const getPendientesDeOtros = (miUsuarioId) => {
     return historial.filter(
       h => h.estado === 'pendiente_verificacion' && h.usuarioId !== miUsuarioId
     );
+  };
+
+  // ── Rotar grupos aleatoriamente ─────────────────────────────────────────
+  const rotarGrupos = async () => {
+    const activos = usuarios.filter(u => !u.isAdmin);
+    if (activos.length === 0) return;
+
+    const grupoIds = ['cocina', 'lavabos_robot', 'tapers_lavanderia'];
+    const disponibles = [...grupoIds];
+
+    // Mezclar aleatoriamente
+    for (let i = disponibles.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [disponibles[i], disponibles[j]] = [disponibles[j], disponibles[i]];
+    }
+
+    // Intentar que nadie repita su grupo anterior
+    const asignaciones = [];
+    const usados = new Set();
+
+    activos.forEach(u => {
+      let elegido = disponibles.find(g => !usados.has(g) && g !== u.grupoActual);
+      if (!elegido) elegido = disponibles.find(g => !usados.has(g));
+      if (elegido) {
+        asignaciones.push({ userId: u.id, grupo: elegido });
+        usados.add(elegido);
+      }
+    });
+
+    const batch = writeBatch(db);
+    asignaciones.forEach(a => {
+      batch.update(doc(db, 'hogar_usuarios', a.userId), { grupoActual: a.grupo });
+    });
+
+    // Guardar fecha de inicio del nuevo ciclo
+    batch.set(doc(db, 'hogar_config', 'rotacion'), {
+      inicioCiclo: fechaLocalHoy(),
+      ultimaRotacion: new Date().toISOString(),
+    });
+
+    await batch.commit();
   };
 
   // ── Tareas ocultas (admin) ────────────────────────────────────────────
@@ -485,11 +482,6 @@ export const useFirestore = () => {
     marcarComprado,
     eliminarProducto,
     limpiarComprados,
-    getHorasSemana,
-    getHorasHoy,
-    getPuntosHoy,
-    getPuntosVerificadosDia,
-    comprobarPenalizacionAyer,
     getPendientesDeOtros,
     tareasCustom,
     agregarTareaCustom,
@@ -497,5 +489,8 @@ export const useFirestore = () => {
     tareasOcultas,
     ocultarTarea,
     restaurarTarea,
+    configRotacion,
+    rotarGrupos,
+    limpiarBoostersExpirados,
   };
 };

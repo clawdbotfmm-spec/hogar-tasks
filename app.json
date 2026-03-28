@@ -2,7 +2,8 @@
   "expo": {
     "name": "Hogar Tasks",
     "slug": "hogar-tasks",
-    "version": "2.3.0",
+    "version": "3.0.0",
+    "runtimeVersion": "3.0.0",
     "orientation": "portrait",
     "icon": "./icon.png",
     "userInterfaceStyle": "dark",
@@ -29,13 +30,16 @@
       "favicon": "./public/favicon.png",
       "name": "Hogar Tasks",
       "shortName": "Hogar",
-      "description": "Gesti\u00f3n de tareas del hogar",
+      "description": "Gestión de tareas del hogar",
       "backgroundColor": "#1e293b",
       "themeColor": "#0f172a",
       "lang": "es",
       "display": "standalone",
       "startUrl": "/",
       "bundler": "metro"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/11f5bcda-4421-4ac8-9b6e-7ee788b8168b"
     },
     "extra": {
       "eas": {

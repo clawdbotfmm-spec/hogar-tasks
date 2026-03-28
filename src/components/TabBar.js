@@ -3,11 +3,12 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { COLORS } from '../constants/colors';
 
 const TABS = [
-  { id: 'tareas',  label: '📋 Tareas',  adminOnly: false, hideAdmin: true },
-  { id: 'lista',   label: '🛒 Lista',   adminOnly: false },
-  { id: 'ranking', label: '🏆 Rank',    adminOnly: false },
-  { id: 'tienda',  label: '🎁 Tienda',  adminOnly: false, hideAdmin: true },
-  { id: 'admin',   label: '👑 Admin',   adminOnly: true  },
+  { id: 'tareas',  icon: '📋', label: 'Tareas',  adminOnly: false, hideAdmin: true },
+  { id: 'logros',  icon: '🏅', label: 'Logros',  adminOnly: false, hideAdmin: true },
+  { id: 'lista',   icon: '🛒', label: 'Lista',   adminOnly: false },
+  { id: 'ranking', icon: '🏆', label: 'Ranking', adminOnly: false },
+  { id: 'tienda',  icon: '🎁', label: 'Tienda',  adminOnly: false, hideAdmin: true },
+  { id: 'admin',   icon: '👑', label: 'Admin',   adminOnly: true  },
 ];
 
 export const TabBar = ({ tab, setTab, isAdmin }) => {
@@ -25,7 +26,8 @@ export const TabBar = ({ tab, setTab, isAdmin }) => {
           style={[styles.tab, tab === t.id && styles.tabActive]}
           onPress={() => setTab(t.id)}
         >
-          <Text style={[styles.text, tab === t.id && styles.textActive]}>
+          <Text style={styles.icon}>{t.icon}</Text>
+          <Text style={[styles.label, tab === t.id && styles.labelActive]}>
             {t.label}
           </Text>
         </TouchableOpacity>
@@ -38,11 +40,18 @@ const styles = StyleSheet.create({
   tabs: {
     flexDirection: 'row',
     backgroundColor: COLORS.bgDark,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.borderLight,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderLight,
+    paddingBottom: 4,
   },
-  tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
-  tabActive: { borderBottomWidth: 3, borderBottomColor: COLORS.blue },
-  text: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '600' },
-  textActive: { color: COLORS.blue },
+  tab: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabActive: {},
+  icon: { fontSize: 22, marginBottom: 2 },
+  label: { color: COLORS.textSecondary, fontSize: 11, fontWeight: '600' },
+  labelActive: { color: COLORS.blue },
 });

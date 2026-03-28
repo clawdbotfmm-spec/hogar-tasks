@@ -6,7 +6,6 @@ import {
   CATEGORIAS_PREMIOS,
   BOOSTERS,
   BOOSTERS_ESPECIALES,
-  RECOMPENSAS_RACHA,
 } from '../constants/tienda';
 import { getBoosterActivo } from '../hooks/useBoosters';
 
@@ -87,17 +86,13 @@ export const TiendaTab = ({
       <View style={styles.card}>
         <Text style={styles.cardTitle}>🔥 Boosters de Puntos</Text>
         {BOOSTERS.map(b => {
-          const recompensa = RECOMPENSAS_RACHA.find(
-            r => r.booster === b.id && (user.racha || 0) >= r.racha
-          );
-          const precio = recompensa ? recompensa.precioFinal : b.puntos;
-          const puedeComprar = (user.puntos || 0) >= precio;
+          const puedeComprar = (user.puntos || 0) >= b.puntos;
 
           return (
             <TouchableOpacity
               key={b.id}
               style={[styles.boosterCard, !puedeComprar && styles.bloqueado]}
-              onPress={() => onComprarBooster(b, precio)}
+              onPress={() => onComprarBooster(b, b.puntos)}
             >
               <View style={styles.boosterLeft}>
                 <Text style={styles.boosterIcon}>{b.icono}</Text>
@@ -109,14 +104,9 @@ export const TiendaTab = ({
               </View>
               <View style={styles.boosterRight}>
                 <Text style={styles.boosterMult}>x{b.multiplicador}</Text>
-                <Text style={[styles.boosterPrecio, recompensa && styles.precioDescuento]}>
-                  {precio} pts
+                <Text style={styles.boosterPrecio}>
+                  {b.puntos} pts
                 </Text>
-                {recompensa && (
-                  <Text style={styles.descuento}>
-                    {recompensa.descuento}% OFF
-                  </Text>
-                )}
               </View>
             </TouchableOpacity>
           );
@@ -144,38 +134,6 @@ export const TiendaTab = ({
         ))}
       </View>
 
-      {/* Recompensas por racha */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>🔥 Recompensas por Racha</Text>
-        <Text style={styles.rachaActual}>Tu racha: {user.racha || 0} días 🔥</Text>
-        {RECOMPENSAS_RACHA.map(r => {
-          const booster = BOOSTERS.find(b => b.id === r.booster);
-          const desbloqueado = (user.racha || 0) >= r.racha;
-          return (
-            <View
-              key={`${r.booster}_${r.racha}`}
-              style={[styles.recompensaCard, desbloqueado && styles.recompensaDesbloqueda]}
-            >
-              <View style={styles.recompensaInfo}>
-                <Text style={styles.boosterIcon}>{booster?.icono}</Text>
-                <View>
-                  <Text style={styles.boosterNombre}>{booster?.nombre}</Text>
-                  <Text style={styles.rachaReq}>Racha {r.racha} días</Text>
-                </View>
-              </View>
-              <View>
-                {desbloqueado ? (
-                  <Text style={styles.gratis}>
-                    {r.precioFinal === 0 ? '¡GRATIS!' : `${r.precioFinal} pts`}
-                  </Text>
-                ) : (
-                  <Text style={styles.bloqueadoText}>🔒 {r.racha}d</Text>
-                )}
-              </View>
-            </View>
-          );
-        })}
-      </View>
     </View>
   );
 };
@@ -236,19 +194,5 @@ const styles = StyleSheet.create({
   boosterRight: { alignItems: 'flex-end' },
   boosterMult: { color: COLORS.yellow, fontSize: 20, fontWeight: '700' },
   boosterPrecio: { color: COLORS.textPrimary, fontSize: 14, marginTop: 2 },
-  precioDescuento: { color: COLORS.green, fontWeight: '600' },
-  descuento: { color: COLORS.green, fontSize: 10, marginTop: 2 },
-
-  // Recompensas racha
-  recompensaCard: {
-    backgroundColor: COLORS.cardInner, borderRadius: 12, padding: 14, marginBottom: 10,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    borderWidth: 1, borderColor: COLORS.border,
-  },
-  recompensaDesbloqueda: { borderColor: COLORS.yellow },
-  recompensaInfo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  rachaReq: { color: COLORS.textSecondary, fontSize: 11 },
-  rachaActual: { color: COLORS.yellow, fontSize: 14, marginBottom: 12, textAlign: 'center' },
-  gratis: { color: COLORS.yellow, fontWeight: '700' },
   bloqueadoText: { color: COLORS.textSecondary },
 });

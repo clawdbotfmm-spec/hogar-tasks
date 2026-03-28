@@ -1,36 +1,29 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { COLORS } from '../constants/colors';
-import { PUNTOS_POR_HORA } from '../constants/tareas';
+import { getGrupoPorId, getDiaEnBloque, diasRestantesBloque } from '../constants/rotacion';
+import { fechaLocalHoy } from '../utils/fecha';
 
 const MEDALLAS = ['🥇', '🥈', '🥉'];
 
-const getRankingSemanal = (usuarios, historial) => {
-  const hoy = new Date();
-  const inicioSemana = new Date(hoy);
-  // Lunes como inicio de semana
-  inicioSemana.setDate(hoy.getDate() - ((hoy.getDay() + 6) % 7));
-  inicioSemana.setHours(0, 0, 0, 0);
-
+const getRankingGlobal = (usuarios, historial) => {
   return usuarios
     .filter(u => !u.isAdmin)
     .map(u => {
       const tareasVerificadas = historial.filter(h =>
         h.usuarioId === u.id &&
-        new Date(h.fecha) >= inicioSemana &&
         h.estado === 'verificada' &&
         h.puntos > 0
       );
       const pts = tareasVerificadas.reduce((sum, h) => sum + (h.puntos || 0), 0);
       const tareas = tareasVerificadas.length;
-      const horas = (pts / PUNTOS_POR_HORA).toFixed(1);
-      return { ...u, puntosSemana: pts, tareasSemana: tareas, horasSemana: horas };
+      return { ...u, puntosTotal: pts, tareasTotal: tareas };
     })
-    .sort((a, b) => b.puntosSemana - a.puntosSemana);
+    .sort((a, b) => b.puntosTotal - a.puntosTotal);
 };
 
 const getStatsHoy = (usuarioId, historial) => {
-  const fechaHoy = new Date().toISOString().split('T')[0];
+  const fechaHoy = fechaLocalHoy();
   const tareasHoy = historial.filter(h =>
     h.usuarioId === usuarioId &&
     h.fechaDia === fechaHoy &&
@@ -38,44 +31,49 @@ const getStatsHoy = (usuarioId, historial) => {
     h.puntos > 0
   );
   const pts = tareasHoy.reduce((sum, h) => sum + (h.puntos || 0), 0);
-  return {
-    puntos: pts,
-    tareas: tareasHoy.length,
-    horas: (pts / PUNTOS_POR_HORA).toFixed(1),
-  };
+  return { puntos: pts, tareas: tareasHoy.length };
 };
 
-export const RankingTab = ({ user, usuarios, historial }) => {
-  const ranking = getRankingSemanal(usuarios, historial);
+export const RankingTab = ({ user, usuarios, historial, configRotacion }) => {
+  const ranking = getRankingGlobal(usuarios, historial);
   const misStatsHoy = getStatsHoy(user.id, historial);
+  const grupo = user.grupoActual ? getGrupoPorId(user.grupoActual) : null;
+  const inicioCiclo = configRotacion?.inicioCiclo || null;
+  const diasRest = diasRestantesBloque(inicioCiclo);
+  const diaActual = getDiaEnBloque(inicioCiclo);
 
   return (
     <View style={styles.tabContent}>
 
       {/* Mi resumen de hoy */}
-      <View style={styles.horasCard}>
-        <Text style={styles.horasTitle}>📱 Tu día de hoy</Text>
-        <View style={styles.horasRow}>
-          <View style={styles.horasItem}>
-            <Text style={styles.horasNum}>{misStatsHoy.horas}h</Text>
-            <Text style={styles.horasLabel}>Pantalla ganada</Text>
+      <View style={styles.statsCard}>
+        <Text style={styles.statsTitle}>Tu día de hoy</Text>
+        <View style={styles.statsRow}>
+          <View style={styles.statsItem}>
+            <Text style={styles.statsNumPts}>{misStatsHoy.puntos}</Text>
+            <Text style={styles.statsLabel}>Puntos</Text>
           </View>
-          <View style={styles.horasDivider} />
-          <View style={styles.horasItem}>
-            <Text style={styles.horasNumPts}>{misStatsHoy.puntos}</Text>
-            <Text style={styles.horasLabel}>Puntos</Text>
+          <View style={styles.statsDivider} />
+          <View style={styles.statsItem}>
+            <Text style={styles.statsNumTareas}>{misStatsHoy.tareas}</Text>
+            <Text style={styles.statsLabel}>Tareas</Text>
           </View>
-          <View style={styles.horasDivider} />
-          <View style={styles.horasItem}>
-            <Text style={styles.horasNumTareas}>{misStatsHoy.tareas}</Text>
-            <Text style={styles.horasLabel}>Tareas</Text>
+          <View style={styles.statsDivider} />
+          <View style={styles.statsItem}>
+            <Text style={styles.statsNumCiclo}>{diasRest}d</Text>
+            <Text style={styles.statsLabel}>Quedan</Text>
           </View>
         </View>
+        {grupo && (
+          <Text style={styles.grupoActual}>
+            {grupo.icono} {grupo.nombre} — Día {diaActual}/5
+          </Text>
+        )}
       </View>
 
-      {/* Ranking semanal */}
+      {/* Ranking global */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>🏆 Ranking semanal</Text>
+        <Text style={styles.cardTitle}>🏆 Ranking</Text>
         {ranking.map((u, i) => (
           <View
             key={u.id}
@@ -90,38 +88,24 @@ export const RankingTab = ({ user, usuarios, historial }) => {
                 {u.id === user.id && <Text style={styles.tu}> (tú)</Text>}
               </Text>
               <Text style={styles.rankSub}>
-                {u.tareasSemana} tareas · 📱 {u.horasSemana}h ganadas
+                {u.tareasTotal} tareas
               </Text>
             </View>
-            <Text style={styles.pts}>{u.puntosSemana} pts</Text>
+            <Text style={styles.pts}>{u.puntosTotal} pts</Text>
           </View>
         ))}
       </View>
 
-      {/* Racha */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>🔥 Tu racha</Text>
-        <Text style={styles.rachaNum}>{user.racha || 0} días</Text>
-        <Text style={styles.rachaBonus}>
-          Bonus: +{Math.min(user.racha || 0, 10) * 5}% por racha
-        </Text>
-      </View>
-
       {/* Puntos totales acumulados */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>💰 Puntos totales acumulados</Text>
+        <Text style={styles.cardTitle}>💰 Puntos acumulados (canjeables)</Text>
         {usuarios
           .filter(u => !u.isAdmin)
           .sort((a, b) => (b.puntos || 0) - (a.puntos || 0))
           .map(u => (
             <View key={u.id} style={styles.puntosItem}>
               <Text style={styles.nombre}>{u.nombre}</Text>
-              <View style={styles.puntosRight}>
-                <Text style={styles.pts}>{u.puntos || 0} pts</Text>
-                <Text style={styles.puntosHoras}>
-                  = {((u.puntos || 0) / PUNTOS_POR_HORA).toFixed(1)}h
-                </Text>
-              </View>
+              <Text style={styles.pts}>{u.puntos || 0} pts</Text>
             </View>
           ))}
       </View>
@@ -139,32 +123,38 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  // Horas card
-  horasCard: {
+  // Stats card
+  statsCard: {
     backgroundColor: COLORS.card,
     borderRadius: 16,
     padding: 16,
     borderWidth: 2,
     borderColor: COLORS.green,
   },
-  horasTitle: {
+  statsTitle: {
     color: COLORS.textPrimary,
     fontSize: 16,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 12,
   },
-  horasRow: {
+  statsRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  horasItem: { alignItems: 'center', flex: 1 },
-  horasNum: { color: COLORS.green, fontSize: 28, fontWeight: '700' },
-  horasNumPts: { color: COLORS.blue, fontSize: 28, fontWeight: '700' },
-  horasNumTareas: { color: COLORS.yellow, fontSize: 28, fontWeight: '700' },
-  horasLabel: { color: COLORS.textSecondary, fontSize: 11, marginTop: 4 },
-  horasDivider: { width: 1, height: 36, backgroundColor: COLORS.border },
+  statsItem: { alignItems: 'center', flex: 1 },
+  statsNumPts: { color: COLORS.blue, fontSize: 28, fontWeight: '700' },
+  statsNumTareas: { color: COLORS.yellow, fontSize: 28, fontWeight: '700' },
+  statsNumCiclo: { color: COLORS.green, fontSize: 28, fontWeight: '700' },
+  statsLabel: { color: COLORS.textSecondary, fontSize: 11, marginTop: 4 },
+  statsDivider: { width: 1, height: 36, backgroundColor: COLORS.border },
+  grupoActual: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 10,
+  },
 
   // Ranking
   item: {
@@ -187,19 +177,6 @@ const styles = StyleSheet.create({
   pts: { color: COLORS.green, fontSize: 16, fontWeight: '700' },
   tu: { color: COLORS.textSecondary, fontSize: 12 },
 
-  // Racha
-  rachaNum: {
-    color: COLORS.yellow,
-    fontSize: 48,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  rachaBonus: {
-    color: COLORS.textSecondary,
-    fontSize: 12,
-    textAlign: 'center',
-  },
-
   // Puntos totales
   puntosItem: {
     flexDirection: 'row',
@@ -209,6 +186,4 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
-  puntosRight: { alignItems: 'flex-end' },
-  puntosHoras: { color: COLORS.blue, fontSize: 11, marginTop: 2 },
 });
